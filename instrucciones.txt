@@ -1,0 +1,139 @@
+INSTRUCCIONES FRONTEND - APLICACIÓN DE GESTIÓN (KitchenFlow)
+
+========================================
+1. VISIÓN GENERAL
+========================================
+La aplicación está orientada a dos tipos de usuarios:
+- Administrador
+- Usuario operativo
+
+Se compone de múltiples vistas interconectadas con navegación tipo dashboard.
+
+========================================
+2. PANTALLA: LOGIN
+========================================
+Componentes:
+- Input email
+- Input contraseña
+- Botón login
+- Link recuperar contraseña
+
+Interacciones:
+- Validación de inputs
+- Envío de credenciales
+- Redirección a dashboard según rol
+
+========================================
+3. PANTALLA: DASHBOARD PRINCIPAL
+========================================
+Componentes:
+- Sidebar navegación
+- Header (usuario, notificaciones)
+- KPIs:
+  - Ventas del día
+  - Costos
+  - Ganancia
+- Gráficos (líneas, barras)
+
+Interacciones:
+- Navegación entre módulos
+- Filtrado por fecha
+
+========================================
+4. PANTALLA: INVENTARIO
+========================================
+Componentes:
+- Tabla de productos
+- Botón agregar producto
+- Buscador
+- Filtros
+- Modal de creación/edición
+
+Interacciones:
+- CRUD productos
+- Actualización en tiempo real
+- Validaciones de stock
+
+========================================
+5. PANTALLA: INGRESO DE INVENTARIO
+========================================
+Componentes:
+- Selector de producto
+- Input cantidad
+- Input costo unitario
+- Botón guardar
+
+Interacciones:
+- Cálculo automático de costo total
+- Actualización de stock
+
+========================================
+6. PANTALLA: RECETAS
+========================================
+Componentes:
+- Lista de recetas
+- Botón crear receta
+- Editor de receta:
+  - Nombre
+  - Ingredientes (lista dinámica)
+  - Cantidades
+
+Interacciones:
+- Asociación con inventario
+- Cálculo automático de costo
+
+========================================
+7. PANTALLA: MENÚ / PLATOS
+========================================
+Componentes:
+- Lista de platos
+- Imagen
+- Precio
+- Botón editar
+
+Interacciones:
+- Relación con recetas
+- Definición de precio final
+
+========================================
+8. PANTALLA: VENTAS
+========================================
+Componentes:
+- Lista de ventas
+- Filtro por fecha
+- Detalle de venta
+
+Interacciones:
+- Visualización
+- Integración con sistema externo (Toteat)
+
+========================================
+9. PANTALLA: REPORTES
+========================================
+Componentes:
+- Gráficos
+- Exportación (PDF/Excel)
+- Filtros avanzados
+
+Interacciones:
+- Generación dinámica
+- Comparación de periodos
+
+========================================
+10. FLUJOS PRINCIPALES
+========================================
+
+FLUJO 1: LOGIN → DASHBOARD
+FLUJO 2: DASHBOARD → INVENTARIO → INGRESO
+FLUJO 3: INVENTARIO → RECETAS → MENÚ
+FLUJO 4: MENÚ → VENTAS → REPORTES
+
+========================================
+11. CONSIDERACIONES UI/UX
+========================================
+- Diseño modular
+- Componentes reutilizables
+- Feedback visual constante
+- Responsive
+
+FIN DEL DOCUMENTO
