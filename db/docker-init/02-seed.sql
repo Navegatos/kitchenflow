@@ -1,12 +1,4 @@
--- =====================================================
--- KitchenFlow - Seed Data
--- PostgreSQL
--- =====================================================
--- Requiere el esquema ya creado (`create.sql` o `docker-init/01-schema.sql`). En Docker, el seed duplicado
--- está en `docker-init/02-seed.sql` para el primer arranque del contenedor.
--- =====================================================
--- USERS
--- =====================================================
+-- Seed para init de Docker — misma carga que `db/populate.sql` (orden 02 para correr tras `01-schema.sql`).
 
 INSERT INTO users (
     first_name,
@@ -21,10 +13,6 @@ VALUES
 ('Diego', 'Chef', 'chef@kitchenflow.cl', 'hashed_password_3', 'CHEF'),
 ('Valentina', 'Waiter', 'waiter@kitchenflow.cl', 'hashed_password_4', 'WAITER');
 
--- =====================================================
--- CATEGORIES
--- =====================================================
-
 INSERT INTO categories (name, description)
 VALUES
 ('Verduras', 'Vegetales y hortalizas'),
@@ -32,10 +20,6 @@ VALUES
 ('Lácteos', 'Productos derivados de leche'),
 ('Bebidas', 'Bebidas y líquidos'),
 ('Panadería', 'Productos de panadería');
-
--- =====================================================
--- SUPPLIERS
--- =====================================================
 
 INSERT INTO suppliers (
     name,
@@ -66,10 +50,6 @@ VALUES
     '+56933333333',
     'Puerto Montt'
 );
-
--- =====================================================
--- PRODUCTS
--- =====================================================
 
 INSERT INTO products (
     category_id,
@@ -145,10 +125,6 @@ VALUES
     1000
 );
 
--- =====================================================
--- RECIPES
--- =====================================================
-
 INSERT INTO recipes (
     name,
     description,
@@ -171,10 +147,6 @@ VALUES
     4990,
     (SELECT id FROM users WHERE email = 'chef@kitchenflow.cl')
 );
-
--- =====================================================
--- RECIPE INGREDIENTS
--- =====================================================
 
 INSERT INTO recipe_ingredients (
     recipe_id,
@@ -213,10 +185,6 @@ VALUES
     1
 );
 
--- =====================================================
--- ORDERS
--- =====================================================
-
 INSERT INTO orders (
     status,
     total_amount,
@@ -236,10 +204,6 @@ VALUES
     'Pedido delivery',
     (SELECT id FROM users WHERE email = 'waiter@kitchenflow.cl')
 );
-
--- =====================================================
--- ORDER ITEMS
--- =====================================================
 
 INSERT INTO order_items (
     order_id,
@@ -263,10 +227,6 @@ VALUES
     4990,
     4990
 );
-
--- =====================================================
--- INVENTORY MOVEMENTS
--- =====================================================
 
 INSERT INTO inventory_movements (
     product_id,
@@ -296,10 +256,6 @@ VALUES
     20,
     'Ingreso inicial de stock'
 );
-
--- =====================================================
--- WASTE RECORDS
--- =====================================================
 
 INSERT INTO waste_records (
     product_id,

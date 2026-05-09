@@ -1,28 +1,8 @@
--- =====================================================
--- KitchenFlow - Database Schema
--- PostgreSQL
--- =====================================================
---
--- Docker Compose: la imagen ya crea la BD `kitchenflow` (POSTGRES_DB). El init automático corre
--- `db/docker-init/01-schema.sql` y `02-seed.sql` (mismo contenido sin CREATE DATABASE y sin pasos manuales).
--- Para crear la BD desde cero en un servidor propio, ejecuta este archivo estando conectado al rol
--- que pueda crear bases (p. ej. `psql -U postgres`); luego `\c kitchenflow` y aplica `populate.sql`.
---
-
-CREATE DATABASE kitchenflow;
-
--- Conectarse posteriormente a la base:
--- \c kitchenflow;
-
--- =====================================================
--- EXTENSIONES
--- =====================================================
+-- KitchenFlow — esquema para init de Docker (postgres:alpine).
+-- Mantener alineado con `db/create.sql`, sin `CREATE DATABASE` (POSTGRES_DB ya define la BD).
+-- Para datos de ejemplo ver `02-seed.sql` ↔ `db/populate.sql`.
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- =====================================================
--- ENUMS
--- =====================================================
 
 CREATE TYPE user_role AS ENUM (
     'ADMIN',
@@ -56,10 +36,6 @@ CREATE TYPE supplier_status AS ENUM (
     'INACTIVE'
 );
 
--- =====================================================
--- TABLA USERS
--- =====================================================
-
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     first_name VARCHAR(100) NOT NULL,
@@ -72,20 +48,12 @@ CREATE TABLE users (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- TABLA CATEGORIES
--- =====================================================
-
 CREATE TABLE categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(120) NOT NULL UNIQUE,
     description TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- =====================================================
--- TABLA SUPPLIERS
--- =====================================================
 
 CREATE TABLE suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -97,10 +65,6 @@ CREATE TABLE suppliers (
     status supplier_status NOT NULL DEFAULT 'ACTIVE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- =====================================================
--- TABLA PRODUCTS
--- =====================================================
 
 CREATE TABLE products (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -119,10 +83,6 @@ CREATE TABLE products (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- TABLA INVENTORY_MOVEMENTS
--- =====================================================
-
 CREATE TABLE inventory_movements (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(id),
@@ -134,10 +94,6 @@ CREATE TABLE inventory_movements (
     notes TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- =====================================================
--- TABLA RECIPES
--- =====================================================
 
 CREATE TABLE recipes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -151,10 +107,6 @@ CREATE TABLE recipes (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- TABLA RECIPE_INGREDIENTS
--- =====================================================
-
 CREATE TABLE recipe_ingredients (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
@@ -162,10 +114,6 @@ CREATE TABLE recipe_ingredients (
     quantity NUMERIC(12,2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- =====================================================
--- TABLA ORDERS
--- =====================================================
 
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -178,10 +126,6 @@ CREATE TABLE orders (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- TABLA ORDER_ITEMS
--- =====================================================
-
 CREATE TABLE order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -192,10 +136,6 @@ CREATE TABLE order_items (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- TABLA WASTE_RECORDS
--- =====================================================
-
 CREATE TABLE waste_records (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(id),
@@ -205,10 +145,6 @@ CREATE TABLE waste_records (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- =====================================================
--- ÍNDICES
--- =====================================================
-
 CREATE INDEX idx_products_category_id ON products(category_id);
 CREATE INDEX idx_products_supplier_id ON products(supplier_id);
 CREATE INDEX idx_inventory_movements_product_id ON inventory_movements(product_id);
@@ -217,17 +153,13 @@ CREATE INDEX idx_recipe_ingredients_product_id ON recipe_ingredients(product_id)
 CREATE INDEX idx_orders_status ON orders(status);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 
--- =====================================================
--- TRIGGER UPDATED_AT
--- =====================================================
-
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER update_users_updated_at
     BEFORE UPDATE ON users

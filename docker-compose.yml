@@ -1,0 +1,68 @@
+# KitchenFlow — orquestación local (solo PostgreSQL)
+#
+# Base de datos: servicio `postgres`; esquema y seed aplicados desde `db/docker-init/` al primer arranque.
+# Fuente “humana” del esquema y datos: `db/create.sql` y `db/populate.sql` (creación manual / referencia).
+#
+# Adminer (http://localhost:8080): UI web — Sistema: PostgreSQL, Servidor: `postgres`, BD/usuario/clave: kitchenflow.
+# También puedes usar `psql`, DBeaver, etc. en localhost:5432.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kitchenflow
+      POSTGRES_PASSWORD: kitchenflow
+      POSTGRES_DB: kitchenflow
+    volumes:
+      - ./db/docker-init:/docker-entrypoint-initdb.d:ro
+      - kitchenflow_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks: [kitchenflow]
+
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks: [kitchenflow]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://kitchenflow:kitchenflow@postgres:5432/kitchenflow
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+    depends_on:
+      postgres:
+        condition: service_started
+    networks: [kitchenflow]
+
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      - backend
+    networks: [kitchenflow]
+
+networks:
+  kitchenflow:
+    driver: bridge
+
+volumes:
+  kitchenflow_pgdata:
