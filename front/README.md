@@ -1,24 +1,32 @@
-# KitchenFlow MVP Demo
+# Frontend (KitchenFlow)
 
-Frontend demo para gestion de restaurante con datos mock.
+Interfaz web en **React 18** generada con **Vite 6**. El servidor de desarrollo escucha en el puerto **5173**.
 
-## Ejecutar en local
+## Ejecutar solo el front con Docker
+
+Desde la raíz del repositorio (levanta también dependencias definidas en Compose: backend y postgres):
 
 ```bash
-npm install
+docker compose up --build front backend postgres
+```
+
+En el contenedor del front se define `VITE_API_URL=http://localhost:8000`. Si el navegador debe llamar a la API que corre en tu máquina (host), ese valor suele ser correcto porque el cliente corre en el navegador, no dentro del contenedor del front.
+
+## Ejecutar solo el front en tu máquina
+
+```bash
+cd front
+npm ci          # o npm install
 npm run dev
 ```
 
-Abrir en `http://localhost:5173`.
+Abre http://localhost:5173.
 
-## Credenciales mock
+La API debe estar en marcha (por defecto en http://localhost:8000) si la aplicación hace peticiones al backend. Si más adelante el proyecto usa variables `VITE_*`, puedes crear un archivo `.env` en `front/` según la convención de Vite.
 
-- Admin: `carlos@kitchenflow.app` / `1234`
-- Operador: `maria@kitchenflow.app` / `1234`
+Otros scripts útiles:
 
-## Flujos principales implementados
-
-- Login -> Dashboard
-- Dashboard -> Inventario -> Ingreso de inventario
-- Inventario -> Recetas -> Menu / Platos
-- Menu / Platos -> Ventas -> Reportes
+```bash
+npm run build    # compilación para producción → salida en dist/
+npm run preview  # sirve la build localmente
+```
