@@ -2,10 +2,12 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, EmailStr
 
 from app.services import auth_service
+from app.db.dependency import get_db
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -16,11 +18,11 @@ class LoginBody(BaseModel):
 
 
 @router.post("/login")
-def login(body: LoginBody) -> dict:
+async def login(body: LoginBody, db: Session = Depends(get_db)) -> dict:
     """
     Valida credenciales y debe devolver token (JWT) y metadatos mínimos del usuario.
     """
-    user = auth_service.authenticate_user(body.email, body.password)
+    user = await auth_service.authenticate_user(body.email, body.password, db)
     return auth_service.build_login_token_payload(user)
 
 

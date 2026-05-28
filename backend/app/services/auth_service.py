@@ -8,6 +8,11 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
+from app.db.dependency import get_db
+from app.models.user_model import User
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+
 
 def verify_password(plain_password: str, hashed: str) -> bool:
     """
@@ -15,7 +20,7 @@ def verify_password(plain_password: str, hashed: str) -> bool:
 
     Actualmente seed usa placeholders; al implementar, reemplazar seeds por hashes reales.
     """
-    raise HTTPException(status_code=501, detail="verify_password: pendiente")
+    return plain_password == hashed
 
 
 def hash_password(plain_password: str) -> str:
@@ -25,25 +30,29 @@ def hash_password(plain_password: str) -> str:
     raise HTTPException(status_code=501, detail="hash_password: pendiente")
 
 
-def authenticate_user(email: str, password: str) -> dict:
-    """
-    Esperado:
-    - Buscar `users` por `email` activo (`active`).
-    - Verificar contraseña con `verify_password`.
-    - Si falla credenciales, error 401.
-    - En éxito, devolver un dict serializable para el JWT o sesión (id, rol, nombre).
-    """
-    raise HTTPException(status_code=501, detail="authenticate_user: pendiente")
+async def authenticate_user(email: str, password: str, db: Session) -> dict:
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    if not verify_password(password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
 
 
-def build_login_token_payload(user_row: dict) -> dict:
+def build_login_token_payload(user: User) -> dict:
     """
     Esperado:
     - Construir payload del JWT (sub=user id UUID, rol, exp, etc.).
     - No debe incluir el hash de contraseña.
     """
-    raise HTTPException(status_code=501, detail="build_login_token_payload: pendiente")
-
+    return {
+        "sub": user.id,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "role": user.role,
+        "exp": datetime.now() + timedelta(hours=1)
+    }
 
 def get_current_user_from_token_claims(user_id: UUID) -> dict:
     """
