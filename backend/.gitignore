@@ -8,4 +8,5 @@
 logs/
 
 # pycache recursively
-**__pycache__/
+__pycache__/
+*.pyc
