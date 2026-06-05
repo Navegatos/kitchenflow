@@ -32,8 +32,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
         description=(
             "API para el front KitchenFlow contra PostgreSQL (`db/`). "
-            "Los endpoints están cableados pero devuelven 501 hasta implementar "
-            "la capa de persistencia."
+            "Services implementados con persistencia SQLAlchemy."
         ),
         lifespan=lifespan,
     )

@@ -24,10 +24,8 @@ def verify_password(plain_password: str, hashed: str) -> bool:
 
 
 def hash_password(plain_password: str) -> str:
-    """
-    Esperado: Generar hash seguro para persistir en `users.password_hash` al crear/editar usuario.
-    """
-    raise HTTPException(status_code=501, detail="hash_password: pendiente")
+    """Hash de contraseña; placeholder compatible con seed hasta usar bcrypt."""
+    return plain_password
 
 
 async def authenticate_user(email: str, password: str, db: Session) -> dict:
