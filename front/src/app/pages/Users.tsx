@@ -4,13 +4,24 @@ import {
   CheckCircle, XCircle, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { type AppUser } from '../data/mockData';
+import { type AppUser } from '../domain/types';
 import { ApiError, backendUserToAppUser, usersApi } from '../api';
+import type { BackendRole } from '../api/types';
+import { ROLE_LABELS } from '../auth/permissions';
 
-function RoleBadge({ role }: { role: AppUser['role'] }) {
-  return role === 'admin'
-    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"><Shield className="w-2.5 h-2.5" />Administrador</span>
-    : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"><User className="w-2.5 h-2.5" />Operador</span>;
+function RoleBadge({ role }: { role: BackendRole }) {
+  const styles: Record<BackendRole, string> = {
+    ADMIN: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400',
+    MANAGER: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
+    CHEF: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
+    WAITER: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${styles[role]}`}>
+      {role === 'ADMIN' || role === 'MANAGER' ? <Shield className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
+      {ROLE_LABELS[role]}
+    </span>
+  );
 }
 
 function StatusBadge({ active }: { active: boolean }) {
@@ -29,9 +40,9 @@ function UserModal({ user, onClose, onSave, saving }: {
     name: user?.name || '',
     email: user?.email || '',
     password: '',
-    role: user?.role || 'operator' as AppUser['role'],
+    role: user?.role || 'WAITER' as BackendRole,
     active: user?.active ?? true,
-    branch: user?.branch || 'Sucursal Centro',
+    branch: user?.branch || '',
   });
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
@@ -56,30 +67,28 @@ function UserModal({ user, onClose, onSave, saving }: {
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Rol</label>
             <div className="grid grid-cols-2 gap-2">
-              {(['admin', 'operator'] as const).map(role => (
+              {(['ADMIN', 'MANAGER', 'CHEF', 'WAITER'] as const).map(role => (
                 <button
                   key={role}
                   onClick={() => set('role', role)}
                   className={`flex items-center gap-2 p-3 rounded-lg border text-xs font-medium transition-colors ${
                     form.role === role
-                      ? role === 'admin'
-                        ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-400'
-                        : 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
+                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
                       : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-slate-300'
                   }`}
                 >
-                  {role === 'admin' ? <Shield className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                  {role === 'admin' ? 'Administrador' : 'Operador'}
+                  {role === 'ADMIN' || role === 'MANAGER' ? <Shield className="w-4 h-4" /> : <User className="w-4 h-4" />}
+                  {ROLE_LABELS[role]}
                 </button>
               ))}
             </div>
           </div>
+          {form.branch && (
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Sucursal</label>
-            <select value={form.branch} onChange={e => set('branch', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {['Sucursal Centro', 'Sucursal Norte', 'Sucursal Sur'].map(b => <option key={b}>{b}</option>)}
-            </select>
+            <input type="text" value={form.branch} disabled className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-500" />
           </div>
+          )}
           <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg">
             <div>
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Estado del usuario</p>
@@ -142,20 +151,22 @@ export default function UsersPage() {
     u.email.toLowerCase().includes(search.toLowerCase())
   );
 
-  const admins = users.filter(u => u.role === 'admin').length;
-  const operators = users.filter(u => u.role === 'operator').length;
+  const admins = users.filter(u => u.role === 'ADMIN').length;
+  const managers = users.filter(u => u.role === 'MANAGER').length;
+  const chefs = users.filter(u => u.role === 'CHEF').length;
+  const waiters = users.filter(u => u.role === 'WAITER').length;
   const activeCount = users.filter(u => u.active).length;
 
-  const permissionRows: Record<string, { admin: boolean; operator: boolean }> = {
-    'Ver Dashboard':           { admin: true, operator: true },
-    'Gestionar Inventario':    { admin: true, operator: true },
-    'Registrar Movimientos':   { admin: true, operator: true },
-    'Gestionar Recetas':       { admin: true, operator: false },
-    'Ver Finanzas':            { admin: true, operator: false },
-    'Ver Ventas (Toteat)':     { admin: true, operator: false },
-    'Registrar Mermas':        { admin: true, operator: true },
-    'Gestionar Usuarios':      { admin: true, operator: false },
-    'Configuración':           { admin: true, operator: false },
+  const permissionRows: Record<string, Record<BackendRole, boolean>> = {
+    'Ver Dashboard':           { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
+    'Gestionar Inventario':    { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
+    'Registrar Movimientos':   { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
+    'Gestionar Recetas':       { ADMIN: true, MANAGER: true, CHEF: true, WAITER: false },
+    'Ver Finanzas':            { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
+    'Ver Ventas (Toteat)':     { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
+    'Registrar Mermas':        { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
+    'Gestionar Usuarios':      { ADMIN: true, MANAGER: false, CHEF: false, WAITER: false },
+    'Configuración':           { ADMIN: true, MANAGER: false, CHEF: false, WAITER: false },
   };
 
   return (
@@ -180,7 +191,8 @@ export default function UsersPage() {
         {[
           { label: 'Total Usuarios', value: users.length.toString(), icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
           { label: 'Administradores', value: admins.toString(), icon: Shield, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-900/20' },
-          { label: 'Operadores', value: operators.toString(), icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+          { label: 'Gerentes', value: managers.toString(), icon: Shield, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+          { label: 'Chefs / Meseros', value: (chefs + waiters).toString(), icon: User, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
           { label: 'Activos', value: activeCount.toString(), icon: CheckCircle, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700/50 flex items-center gap-3">
@@ -273,19 +285,20 @@ export default function UsersPage() {
                 <tr className="bg-slate-50 dark:bg-slate-700/30 border-b border-slate-200 dark:border-slate-700/50">
                   <th className="text-left px-4 py-2.5 text-slate-500 font-medium">Función</th>
                   <th className="text-center px-3 py-2.5 text-violet-600 dark:text-violet-400 font-medium">Admin</th>
-                  <th className="text-center px-3 py-2.5 text-blue-600 dark:text-blue-400 font-medium">Oper.</th>
+                  <th className="text-center px-3 py-2.5 text-indigo-600 dark:text-indigo-400 font-medium">Ger.</th>
+                  <th className="text-center px-3 py-2.5 text-amber-600 dark:text-amber-400 font-medium">Chef</th>
+                  <th className="text-center px-3 py-2.5 text-blue-600 dark:text-blue-400 font-medium">Mes.</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.entries(permissionRows).map(([func, perms]) => (
                   <tr key={func} className="border-b border-slate-100 dark:border-slate-700/30">
                     <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{func}</td>
-                    <td className="text-center px-3 py-2.5">
-                      {perms.admin ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : <XCircle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
-                    </td>
-                    <td className="text-center px-3 py-2.5">
-                      {perms.operator ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : <XCircle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
-                    </td>
+                    {(['ADMIN', 'MANAGER', 'CHEF', 'WAITER'] as const).map(role => (
+                      <td key={role} className="text-center px-3 py-2.5">
+                        {perms[role] ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : <XCircle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
+                      </td>
+                    ))}
                   </tr>
                 ))}
               </tbody>
@@ -311,7 +324,7 @@ export default function UsersPage() {
                   name: data.name!,
                   email: data.email!,
                   password: data.password || 'changeme',
-                  role: data.role || 'operator',
+                  role: data.role || 'WAITER',
                 });
                 setUsers(prev => [...prev, backendUserToAppUser(created)]);
                 toast.success(`Usuario "${data.name}" creado correctamente`);

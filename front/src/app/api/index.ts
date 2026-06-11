@@ -1,4 +1,5 @@
 export { getApiBaseUrl, getApiV1Url } from './config';
+export { translateApiError } from './errors';
 export { api, apiRequest, ApiError, checkBackendHealth } from './client';
 export * from './types';
 export * from './mappers';

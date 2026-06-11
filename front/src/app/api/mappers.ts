@@ -30,11 +30,10 @@ export function toIsoDate(value: string | null | undefined): string {
 
 export function mapBackendRole(role: BackendRole | string): AppUser['role'] {
   const upper = role.toUpperCase();
-  return upper === 'ADMIN' || upper === 'MANAGER' ? 'admin' : 'operator';
-}
-
-export function mapFrontendRole(role: AppUser['role']): BackendRole {
-  return role === 'admin' ? 'ADMIN' : 'WAITER';
+  if (upper === 'ADMIN' || upper === 'MANAGER' || upper === 'CHEF' || upper === 'WAITER') {
+    return upper as AppUser['role'];
+  }
+  return 'WAITER';
 }
 
 export function splitFullName(name: string): { first_name: string; last_name: string } {
@@ -59,7 +58,7 @@ export function loginResponseToAppUser(data: LoginResponse): AppUser {
     role: mapBackendRole(data.role),
     active: true,
     lastLogin: new Date().toLocaleString('es-CL'),
-    branch: 'Sucursal Centro',
+    branch: '',
   };
 }
 
@@ -71,7 +70,7 @@ export function backendUserToAppUser(user: BackendUser): AppUser {
     role: mapBackendRole(user.role),
     active: user.active,
     lastLogin: user.updated_at ? new Date(user.updated_at).toLocaleString('es-CL') : '—',
-    branch: 'Sucursal Centro',
+    branch: '',
   };
 }
 

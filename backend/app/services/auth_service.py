@@ -31,9 +31,9 @@ def hash_password(plain_password: str) -> str:
 async def authenticate_user(email: str, password: str, db: Session) -> dict:
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(status_code=401, detail="User not found")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
     if not verify_password(password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
     return user
 
 

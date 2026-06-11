@@ -1,7 +1,6 @@
 import { api } from '../client';
-import type { BackendUser } from '../types';
-import { mapFrontendRole, splitFullName } from '../mappers';
-import type { AppUser } from '../../data/mockData';
+import type { BackendRole, BackendUser } from '../types';
+import { splitFullName } from '../mappers';
 
 export async function listUsers(params?: { active_only?: boolean; role?: string }): Promise<BackendUser[]> {
   return api.get<BackendUser[]>('/users', params);
@@ -15,7 +14,7 @@ export async function createUser(data: {
   name: string;
   email: string;
   password: string;
-  role: AppUser['role'];
+  role: BackendRole;
 }): Promise<BackendUser> {
   const { first_name, last_name } = splitFullName(data.name);
   return api.post<BackendUser>('/users', {
@@ -23,13 +22,13 @@ export async function createUser(data: {
     first_name,
     last_name,
     password: data.password,
-    role: mapFrontendRole(data.role),
+    role: data.role,
   });
 }
 
 export async function updateUser(
   userId: string,
-  data: Partial<Pick<AppUser, 'name' | 'email' | 'role' | 'active'>>,
+  data: Partial<{ name: string; email: string; role: BackendRole; active: boolean }>,
 ): Promise<BackendUser> {
   const body: Record<string, unknown> = {};
   if (data.name) {
@@ -38,7 +37,7 @@ export async function updateUser(
     body.last_name = last_name;
   }
   if (data.email !== undefined) body.email = data.email;
-  if (data.role !== undefined) body.role = mapFrontendRole(data.role);
+  if (data.role !== undefined) body.role = data.role;
   if (data.active !== undefined) body.active = data.active;
   return api.patch<BackendUser>(`/users/${userId}`, body);
 }

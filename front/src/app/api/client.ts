@@ -1,3 +1,4 @@
+import { translateApiError } from './errors';
 import { getApiV1Url } from './config';
 
 export class ApiError extends Error {
@@ -55,7 +56,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   });
 
   if (!response.ok) {
-    const message = await parseErrorResponse(response);
+    const message = translateApiError(await parseErrorResponse(response));
     throw new ApiError(message, response.status);
   }
 

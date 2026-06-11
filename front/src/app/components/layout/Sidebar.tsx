@@ -7,6 +7,7 @@ import {
   Building2
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { canAccessPath } from '../../auth/permissions';
 
 const navItems = [
   { path: '/',         label: 'Dashboard',   icon: LayoutDashboard },
@@ -23,8 +24,10 @@ const navItems = [
 ];
 
 export function Sidebar() {
-  const { sidebarCollapsed, setSidebarCollapsed, branch } = useApp();
+  const { sidebarCollapsed, setSidebarCollapsed, branch, currentUser } = useApp();
   const location = useLocation();
+
+  const visibleNavItems = navItems.filter(item => canAccessPath(currentUser.role, item.path));
 
   return (
     <aside
@@ -34,7 +37,6 @@ export function Sidebar() {
         ${sidebarCollapsed ? 'w-16' : 'w-60'}
       `}
     >
-      {/* Logo */}
       <div className={`flex items-center gap-3 px-4 py-5 border-b border-slate-700/50 ${sidebarCollapsed ? 'justify-center' : ''}`}>
         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500 flex-shrink-0">
           <Waves className="w-4 h-4 text-white" />
@@ -47,8 +49,7 @@ export function Sidebar() {
         )}
       </div>
 
-      {/* Branch selector */}
-      {!sidebarCollapsed && (
+      {!sidebarCollapsed && branch && (
         <div className="px-3 py-2 border-b border-slate-700/50">
           <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
             <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
@@ -57,9 +58,8 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Nav */}
       <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-        {navItems.map(({ path, label, icon: Icon }) => {
+        {visibleNavItems.map(({ path, label, icon: Icon }) => {
           const isActive = path === '/'
             ? location.pathname === '/'
             : location.pathname.startsWith(path);
@@ -89,7 +89,6 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Bottom collapse button */}
       <div className="p-2 border-t border-slate-700/50">
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}

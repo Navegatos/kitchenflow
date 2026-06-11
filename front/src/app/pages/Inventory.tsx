@@ -5,8 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  formatCurrency, isLowStock, units,
-  categories as defaultCategories,
+  formatCurrency, isLowStock, PRODUCT_UNITS,
   type Ingredient, type StockMovement,
 } from '../data/mockData';
 import {
@@ -126,11 +125,12 @@ function AddStockModal({ item, onClose, onSave }: {
 
 // ─── Add Ingredient Modal ─────────────────────────────────────────────────────
 
-function AddIngredientModal({ onClose, onSave }: {
+function AddIngredientModal({ categories, onClose, onSave }: {
+  categories: string[];
   onClose: () => void;
   onSave: (data: Partial<Ingredient>) => void;
 }) {
-  const [form, setForm] = useState({ name: '', unit: 'kg', category: 'Proteínas', stock: '', minStock: '', costPerUnit: '', supplier: '' });
+  const [form, setForm] = useState({ name: '', unit: 'kg', category: categories[0] || 'Sin categoría', stock: '', minStock: '', costPerUnit: '', supplier: '' });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   return (
@@ -164,13 +164,13 @@ function AddIngredientModal({ onClose, onSave }: {
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Unidad</label>
             <select value={form.unit} onChange={e => set('unit', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {units.map(u => <option key={u}>{u}</option>)}
+              {PRODUCT_UNITS.map(u => <option key={u}>{u}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Categoría</label>
             <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {defaultCategories.map(c => <option key={c}>{c}</option>)}
+              {(categories.length > 0 ? categories : ['Sin categoría']).map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -483,6 +483,7 @@ export default function Inventory() {
       )}
       {showAddModal && (
         <AddIngredientModal
+          categories={categories}
           onClose={() => setShowAddModal(false)}
           onSave={async (data) => {
             try {

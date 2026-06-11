@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router';
 import { Lock, Mail, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import { getHomePath } from '../auth/permissions';
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useApp();
-  const [email, setEmail] = useState('admin@kitchenflow.cl');
-  const [password, setPassword] = useState('hashed_password_1');
+  const { login, isAuthenticated, currentUser } = useApp();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  if (isAuthenticated) return <Navigate to={getHomePath(currentUser.role)} replace />;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +24,7 @@ export default function Login() {
         setError(result.message || 'No fue posible iniciar sesión');
         return;
       }
-      navigate('/');
+      navigate(getHomePath(result.role || 'WAITER'));
     } finally {
       setLoading(false);
     }
@@ -34,7 +35,7 @@ export default function Login() {
       <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-lg p-6 space-y-5">
         <div className="text-center">
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">KitchenFlow</h1>
-          <p className="text-sm text-slate-500 mt-1">Inicia sesión contra la API del backend</p>
+          <p className="text-sm text-slate-500 mt-1">Inicia sesión en tu cuenta</p>
         </div>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
@@ -47,6 +48,7 @@ export default function Login() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 disabled={loading}
+                placeholder="correo@restaurante.com"
                 className="w-full bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200"
               />
             </div>
@@ -60,6 +62,7 @@ export default function Login() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 disabled={loading}
+                placeholder="••••••••"
                 className="w-full bg-transparent outline-none text-sm text-slate-700 dark:text-slate-200"
               />
             </div>
@@ -71,13 +74,9 @@ export default function Login() {
             className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white py-2.5 text-sm font-medium inline-flex items-center justify-center gap-2"
           >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            {loading ? 'Conectando…' : 'Ingresar al dashboard'}
+            {loading ? 'Conectando…' : 'Ingresar'}
           </button>
         </form>
-
-        <p className="text-center text-xs text-slate-400">
-          Usuarios de prueba del seed: admin@kitchenflow.cl, chef@kitchenflow.cl, etc.
-        </p>
 
         <div className="text-center">
           <Link to="/login" className="text-xs text-blue-600 hover:underline">

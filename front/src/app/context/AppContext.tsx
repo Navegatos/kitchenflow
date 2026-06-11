@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { type AppUser } from '../data/mockData';
+import { type AppUser } from '../domain/types';
 import {
   authApi,
   ApiError,
   getStoredSession,
   loginResponseToAppUser,
+  translateApiError,
 } from '../api';
 
 interface AppContextType {
@@ -12,7 +13,7 @@ interface AppContextType {
   toggleDarkMode: () => void;
   currentUser: AppUser;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ ok: boolean; message?: string }>;
+  login: (email: string, password: string) => Promise<{ ok: boolean; message?: string; role?: AppUser['role'] }>;
   logout: () => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
@@ -24,10 +25,10 @@ const GUEST_USER: AppUser = {
   id: '',
   name: 'Invitado',
   email: '',
-  role: 'operator',
+  role: 'WAITER',
   active: false,
   lastLogin: '',
-  branch: 'Sucursal Centro',
+  branch: '',
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -37,7 +38,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<AppUser>(GUEST_USER);
-  const [branch, setBranch] = useState(GUEST_USER.branch);
+  const [branch, setBranch] = useState('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -71,12 +72,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const user = loginResponseToAppUser(session);
       setCurrentUser(user);
       setIsAuthenticated(true);
-      return { ok: true };
+      return { ok: true, role: user.role };
     } catch (error) {
       const message =
         error instanceof ApiError
           ? error.message
-          : 'No se pudo conectar con el servidor. Verifica que el backend esté en marcha.';
+          : translateApiError(
+              error instanceof Error ? error.message : 'Error de conexión',
+            );
       return { ok: false, message };
     }
   }, []);
