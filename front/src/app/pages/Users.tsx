@@ -9,6 +9,7 @@ import { ApiError, backendUserToAppUser, configApi, usersApi } from '../api';
 import type { BackendBranch } from '../api/services/config';
 import type { BackendRole } from '../api/types';
 import { getFeaturePermissions, getRoleLabels } from '../auth/permissions';
+import { Switch } from '../components/ui/switch';
 
 function RoleBadge({ role }: { role: BackendRole }) {
   const styles: Record<BackendRole, string> = {
@@ -101,12 +102,11 @@ function UserModal({ user, branches, onClose, onSave, saving }: {
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Estado del usuario</p>
               <p className="text-xs text-slate-400">{form.active ? 'El usuario puede acceder al sistema' : 'Acceso bloqueado'}</p>
             </div>
-            <button
-              onClick={() => set('active', !form.active)}
-              className={`relative w-10 h-5 rounded-full transition-colors ${form.active ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-            >
-              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.active ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
+            <Switch
+              checked={form.active}
+              onCheckedChange={checked => set('active', checked)}
+              className="data-[state=checked]:bg-emerald-500"
+            />
           </div>
         </div>
         <div className="flex gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700">

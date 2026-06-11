@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ApiError, configApi, settingsApi } from '../api';
 import type { AppSettingsResponse } from '../api/services/settings';
 import type { LookupOption } from '../api/services/config';
+import { Switch } from '../components/ui/switch';
 
 function Section({ title, description, icon: Icon, children }: {
   title: string; description: string; icon: React.ElementType; children: React.ReactNode;
@@ -36,14 +37,6 @@ function FormField({ label, sub, children }: { label: string; sub?: string; chil
       </div>
       <div className="flex-1">{children}</div>
     </div>
-  );
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button onClick={onChange} className={`relative w-10 h-5 rounded-full transition-colors ${checked ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0.5'}`} />
-    </button>
   );
 }
 
@@ -155,7 +148,7 @@ export default function SettingsPage() {
           <input type="number" value={financial.tax_rate} onChange={e => setSettings(p => p && ({ ...p, financial: { ...p.financial, tax_rate: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none" min="0" max="100" />
         </FormField>
         <FormField label="Precios incluyen IVA" sub="Los precios de venta incluyen impuestos">
-          <Toggle checked={financial.include_vat} onChange={() => setSettings(p => p && ({ ...p, financial: { ...p.financial, include_vat: !p.financial.include_vat } }))} />
+          <Switch checked={financial.include_vat} onCheckedChange={checked => setSettings(p => p && ({ ...p, financial: { ...p.financial, include_vat: checked } }))} />
         </FormField>
         <FormField label="Margen objetivo (%)" sub="Alerta si el margen cae por debajo">
           <input type="number" value={financial.margin_target} onChange={e => setSettings(p => p && ({ ...p, financial: { ...p.financial, margin_target: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none" min="0" max="100" />
@@ -174,7 +167,7 @@ export default function SettingsPage() {
       <Section title="Integración Toteat" description="Configuración de sincronización de ventas" icon={Zap}>
         <FormField label="Estado de integración">
           <div className="flex items-center gap-3">
-            <Toggle checked={integrations.toteat_enabled} onChange={() => setSettings(p => p && ({ ...p, integrations: { ...p.integrations, toteat_enabled: !p.integrations.toteat_enabled } }))} />
+            <Switch checked={integrations.toteat_enabled} onCheckedChange={checked => setSettings(p => p && ({ ...p, integrations: { ...p.integrations, toteat_enabled: checked } }))} />
             <span className={`text-xs font-medium ${integrations.toteat_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
               {integrations.toteat_enabled ? 'Conectado' : 'Desconectado'}
             </span>
@@ -208,11 +201,11 @@ export default function SettingsPage() {
           ['profit_alert', 'Alerta de rentabilidad', 'Notificar si el margen cae bajo el objetivo'],
         ] as const).map(([key, label, sub]) => (
           <FormField key={key} label={label} sub={sub}>
-            <Toggle
+            <Switch
               checked={notifications[key]}
-              onChange={() => setSettings(p => p && ({
+              onCheckedChange={checked => setSettings(p => p && ({
                 ...p,
-                notifications: { ...p.notifications, [key]: !p.notifications[key] },
+                notifications: { ...p.notifications, [key]: checked },
               }))}
             />
           </FormField>
