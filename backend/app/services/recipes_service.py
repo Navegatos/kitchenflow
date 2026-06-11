@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.products_catalog_model import Product
 from app.models.recipes_model import Recipe, RecipeIngredient, RecipeStatus
+from app.services import config_service
 from app.services.serializers import decimal_str, dt_iso, enum_val, parse_uuid, uuid_str
 
 
@@ -21,11 +22,18 @@ def _ingredient_line_to_dict(line: RecipeIngredient, product: Product | None = N
     }
 
 
-def _recipe_to_dict(recipe: Recipe, *, ingredients: list[dict] | None = None) -> dict:
+def _recipe_to_dict(
+    recipe: Recipe,
+    *,
+    ingredients: list[dict] | None = None,
+    category_name: str | None = None,
+) -> dict:
     data = {
         "id": uuid_str(recipe.id),
         "name": recipe.name,
         "description": recipe.description,
+        "category_id": uuid_str(recipe.category_id),
+        "category_name": category_name,
         "preparation_time_minutes": recipe.preparation_time_minutes,
         "sale_price": decimal_str(recipe.sale_price),
         "status": enum_val(recipe.status),
@@ -68,7 +76,11 @@ def list_recipes(
         q = q.filter(Recipe.name.ilike(f"%{search}%"))
     recipes = q.order_by(Recipe.name).all()
     return [
-        _recipe_to_dict(r, ingredients=_load_ingredients(db, r.id))
+        _recipe_to_dict(
+            r,
+            ingredients=_load_ingredients(db, r.id),
+            category_name=config_service.get_recipe_category_name(db, r.category_id),
+        )
         for r in recipes
     ]
 
@@ -77,7 +89,11 @@ def get_recipe(db: Session, recipe_id: UUID) -> dict:
     recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
     if not recipe:
         raise HTTPException(status_code=404, detail="Receta no encontrada")
-    return _recipe_to_dict(recipe, ingredients=_load_ingredients(db, recipe_id))
+    return _recipe_to_dict(
+        recipe,
+        ingredients=_load_ingredients(db, recipe_id),
+        category_name=config_service.get_recipe_category_name(db, recipe.category_id),
+    )
 
 
 def create_recipe(
@@ -89,10 +105,12 @@ def create_recipe(
     sale_price: Decimal,
     created_by: UUID | None,
     status: str = "ACTIVE",
+    category_id: UUID | None = None,
 ) -> dict:
     recipe = Recipe(
         name=name,
         description=description,
+        category_id=category_id,
         preparation_time_minutes=preparation_time_minutes,
         sale_price=sale_price,
         created_by=created_by,
@@ -101,7 +119,11 @@ def create_recipe(
     db.add(recipe)
     db.commit()
     db.refresh(recipe)
-    return _recipe_to_dict(recipe, ingredients=[])
+    return _recipe_to_dict(
+        recipe,
+        ingredients=[],
+        category_name=config_service.get_recipe_category_name(db, recipe.category_id),
+    )
 
 
 def update_recipe(
@@ -113,6 +135,8 @@ def update_recipe(
     preparation_time_minutes: int | None = None,
     sale_price: Decimal | None = None,
     status: str | None = None,
+    category_id: UUID | None = None,
+    clear_category: bool = False,
 ) -> dict:
     recipe = db.query(Recipe).filter(Recipe.id == recipe_id).first()
     if not recipe:
@@ -128,6 +152,10 @@ def update_recipe(
         recipe.sale_price = sale_price
     if status is not None:
         recipe.status = _parse_recipe_status(status)
+    if clear_category:
+        recipe.category_id = None
+    elif category_id is not None:
+        recipe.category_id = category_id
 
     db.commit()
     db.refresh(recipe)
@@ -179,6 +207,8 @@ def list_menu_recipes(db: Session) -> list:
             "id": uuid_str(r.id),
             "name": r.name,
             "description": r.description,
+            "category_id": uuid_str(r.category_id),
+            "category_name": config_service.get_recipe_category_name(db, r.category_id),
             "sale_price": decimal_str(r.sale_price),
         }
         for r in recipes

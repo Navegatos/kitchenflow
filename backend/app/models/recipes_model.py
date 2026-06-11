@@ -34,6 +34,7 @@ class Recipe(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(String(150), nullable=False)
     description = Column(Text)
+    category_id = Column(UUID(as_uuid=True), ForeignKey("recipe_categories.id"), nullable=True)
     preparation_time_minutes = Column(Integer)
     sale_price = Column(Numeric(12, 2), nullable=False)
     status = Column(

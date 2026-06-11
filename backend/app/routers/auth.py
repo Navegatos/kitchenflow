@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, EmailStr
 
 from app.services import auth_service
@@ -22,14 +22,17 @@ async def login(body: LoginBody, db: Session = Depends(get_db)) -> dict:
     """
     Valida credenciales y debe devolver token (JWT) y metadatos mínimos del usuario.
     """
+    from app.services import config_service
+
     user = await auth_service.authenticate_user(body.email, body.password, db)
-    return auth_service.build_login_token_payload(user)
+    branch_name = config_service.get_branch_name(db, user.branch_id)
+    return auth_service.build_login_token_payload(user, branch_name=branch_name)
 
 
 @router.get("/me")
-def me_stub() -> dict:
+def me(user_id: UUID = Query(...), db: Session = Depends(get_db)) -> dict:
     """
-    Stub: en producción leer `Authorization: Bearer` y resolver usuario.
-    Aquí solo dispara el stub de carga por UUID (siempre 501 hasta JWT).
+    Valida que la sesión siga vigente: usuario existe y está activo.
+    Hasta tener JWT, el front envía el `sub` guardado en localStorage.
     """
-    return auth_service.get_current_user_from_token_claims(UUID(int=0))
+    return auth_service.get_current_user_from_token_claims(user_id, db)

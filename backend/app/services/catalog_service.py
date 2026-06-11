@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.inventory_model import InventoryMovement, MovementType
 from app.models.products_catalog_model import Category, Product, Supplier, SupplierStatus
+from app.services import config_service
 from app.services.serializers import decimal_str, dt_iso, enum_val, parse_uuid, uuid_str
 
 
@@ -185,6 +186,7 @@ def create_product(
     sale_price: Decimal | None,
     initial_stock: Decimal,
 ) -> dict:
+    unit = config_service.validate_product_unit(db, unit)
     product = Product(
         name=name,
         unit=unit,

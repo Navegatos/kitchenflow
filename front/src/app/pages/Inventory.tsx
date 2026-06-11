@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  Plus, Search, Filter, Package, AlertTriangle, Edit2,
-  Trash2, ArrowUpCircle, ArrowDownCircle, X, ChevronDown,
-  TrendingUp, RefreshCw
+  Plus, Search, Package, AlertTriangle, Edit2,
+  X, TrendingUp, RefreshCw, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  ingredients as initialIngredients, stockMovements,
-  formatCurrency, isLowStock, categories, units,
-  type Ingredient, type StockMovement, getIngredientById
+  formatCurrency, isLowStock,
+  type Ingredient, type StockMovement,
 } from '../data/mockData';
+import {
+  ApiError,
+  backendMovementToStockMovement,
+  backendProductToIngredient,
+  catalogApi,
+  configApi,
+  inventoryApi,
+  mapMovementTypeToBack,
+} from '../api';
+import { useApp } from '../context/AppContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -118,11 +126,16 @@ function AddStockModal({ item, onClose, onSave }: {
 
 // ─── Add Ingredient Modal ─────────────────────────────────────────────────────
 
-function AddIngredientModal({ onClose, onSave }: {
+function AddIngredientModal({ categories, units, onClose, onSave }: {
+  categories: string[];
+  units: string[];
   onClose: () => void;
   onSave: (data: Partial<Ingredient>) => void;
 }) {
-  const [form, setForm] = useState({ name: '', unit: 'kg', category: 'Proteínas', stock: '', minStock: '', costPerUnit: '', supplier: '' });
+  const [form, setForm] = useState({
+    name: '', unit: units[0] || 'kg', category: categories[0] || 'Sin categoría',
+    stock: '', minStock: '', costPerUnit: '', supplier: '',
+  });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   return (
@@ -156,13 +169,13 @@ function AddIngredientModal({ onClose, onSave }: {
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Unidad</label>
             <select value={form.unit} onChange={e => set('unit', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {units.map(u => <option key={u}>{u}</option>)}
+              {(units.length > 0 ? units : ['kg']).map(u => <option key={u}>{u}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Categoría</label>
             <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {categories.map(c => <option key={c}>{c}</option>)}
+              {(categories.length > 0 ? categories : ['Sin categoría']).map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -191,14 +204,57 @@ function AddIngredientModal({ onClose, onSave }: {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Inventory() {
-  const [items, setItems] = useState<Ingredient[]>(initialIngredients);
+  const { currentUser } = useApp();
+  const [items, setItems] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('Todas');
   const [filterStatus, setFilterStatus] = useState('Todos');
   const [activeTab, setActiveTab] = useState<'inventory' | 'movements'>('inventory');
   const [selectedItem, setSelectedItem] = useState<Ingredient | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [movements, setMovements] = useState<StockMovement[]>(stockMovements);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [productUnits, setProductUnits] = useState<string[]>([]);
+
+  useEffect(() => {
+    configApi.listProductUnits()
+      .then(units => setProductUnits(units.map(u => u.code)))
+      .catch(() => setProductUnits([]));
+  }, []);
+
+  const productsById = useMemo(
+    () => new Map(items.map(item => [item.id, item])),
+    [items],
+  );
+
+  const categories = useMemo(
+    () => [...new Set(items.map(i => i.category).filter(Boolean))].sort(),
+    [items],
+  );
+
+  const loadInventory = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [products, movementRows] = await Promise.all([
+        catalogApi.listProducts({ active_only: true }),
+        inventoryApi.listMovements({ limit: 200 }),
+      ]);
+      const mappedProducts = products.map(backendProductToIngredient);
+      const mappedMovements = movementRows.map(row =>
+        backendMovementToStockMovement(row, new Map(mappedProducts.map(p => [p.id, p]))),
+      );
+      setItems(mappedProducts);
+      setMovements(mappedMovements);
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'No se pudo cargar el inventario');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadInventory();
+  }, [loadInventory]);
 
   const filtered = items.filter(item => {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase()) || item.supplier.toLowerCase().includes(search.toLowerCase());
@@ -213,20 +269,22 @@ export default function Inventory() {
   const lowCount = items.filter(isLowStock).length;
   const totalValue = items.reduce((s, i) => s + i.stock * i.costPerUnit, 0);
 
-  const handleMovement = (type: 'purchase' | 'usage' | 'waste', qty: number, notes: string) => {
-    if (!selectedItem) return;
-    const newMovement: StockMovement = {
-      id: `m${Date.now()}`, ingredientId: selectedItem.id, type, quantity: qty,
-      unit: selectedItem.unit, date: new Date().toISOString().split('T')[0],
-      cost: qty * selectedItem.costPerUnit, notes, userId: 'u1',
-    };
-    setMovements(prev => [newMovement, ...prev]);
-    setItems(prev => prev.map(i => i.id === selectedItem.id
-      ? { ...i, stock: type === 'purchase' ? i.stock + qty : Math.max(0, i.stock - qty), lastUpdated: new Date().toISOString().split('T')[0] }
-      : i
-    ));
-    toast.success(`Movimiento registrado: ${type === 'purchase' ? '+' : '-'}${qty} ${selectedItem.unit} de ${selectedItem.name}`);
-    setSelectedItem(null);
+  const handleMovement = async (type: 'purchase' | 'usage' | 'waste', qty: number, notes: string) => {
+    if (!selectedItem || !currentUser.id) return;
+    try {
+      await inventoryApi.createMovement({
+        product_id: selectedItem.id,
+        actor_user_id: currentUser.id,
+        movement_type: mapMovementTypeToBack(type),
+        quantity: qty,
+        notes: notes || undefined,
+      });
+      toast.success(`Movimiento registrado: ${type === 'purchase' ? '+' : '-'}${qty} ${selectedItem.unit} de ${selectedItem.name}`);
+      setSelectedItem(null);
+      await loadInventory();
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'No se pudo registrar el movimiento');
+    }
   };
 
   return (
@@ -285,6 +343,13 @@ export default function Inventory() {
 
       {activeTab === 'inventory' && (
         <>
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-slate-400 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Cargando inventario…
+            </div>
+          ) : (
+          <>
           {/* Filters */}
           <div className="flex flex-wrap gap-3">
             <div className="flex items-center gap-2 flex-1 min-w-48 px-3 py-2 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -377,6 +442,8 @@ export default function Inventory() {
               )}
             </div>
           </div>
+          </>
+          )}
         </>
       )}
 
@@ -400,7 +467,7 @@ export default function Inventory() {
               </thead>
               <tbody>
                 {movements.map(mov => {
-                  const ing = getIngredientById(mov.ingredientId);
+                  const ing = productsById.get(mov.ingredientId);
                   return (
                     <tr key={mov.id} className="border-b border-slate-100 dark:border-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
                       <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{mov.date}</td>
@@ -428,14 +495,24 @@ export default function Inventory() {
       )}
       {showAddModal && (
         <AddIngredientModal
+          categories={categories}
+          units={productUnits}
           onClose={() => setShowAddModal(false)}
-          onSave={(data) => {
-            const newItem: Ingredient = {
-              id: `i${Date.now()}`, ...data as Ingredient,
-            };
-            setItems(prev => [...prev, newItem]);
-            toast.success(`Ingrediente "${data.name}" agregado al inventario`);
-            setShowAddModal(false);
+          onSave={async (data) => {
+            try {
+              await catalogApi.createProduct({
+                name: data.name!,
+                unit: data.unit || 'kg',
+                cost_price: Number(data.costPerUnit) || 0,
+                minimum_stock: Number(data.minStock) || 0,
+                initial_stock: Number(data.stock) || 0,
+              });
+              toast.success(`Ingrediente "${data.name}" agregado al inventario`);
+              setShowAddModal(false);
+              await loadInventory();
+            } catch (error) {
+              toast.error(error instanceof ApiError ? error.message : 'No se pudo crear el producto');
+            }
           }}
         />
       )}

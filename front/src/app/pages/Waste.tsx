@@ -1,31 +1,28 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  Trash2, AlertTriangle, Plus, X, TrendingDown, DollarSign, Package
+  Trash2, AlertTriangle, Plus, X, TrendingDown, DollarSign, Package, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency, type Ingredient, type WasteRecord } from '../data/mockData';
 import {
-  wasteRecords as initialWaste, ingredients, formatCurrency,
-  type WasteRecord
-} from '../data/mockData';
+  ApiError, backendProductToIngredient, backendWasteToWasteRecord,
+  catalogApi, configApi, wasteApi,
+} from '../api';
+import { useApp } from '../context/AppContext';
 
-const REASONS = [
-  'Vencimiento', 'Deterioro por calor', 'Cadena de frío rota',
-  'Deterioro por humedad', 'Carne no vendida', 'Deterioro', 'Error de cocción',
-  'Sobreproducción', 'Accidente', 'Otro'
-];
-
-function AddWasteModal({ onClose, onSave }: {
+function AddWasteModal({ ingredients, reasons, onClose, onSave }: {
+  ingredients: Ingredient[];
+  reasons: string[];
   onClose: () => void;
-  onSave: (data: Partial<WasteRecord>) => void;
+  onSave: (data: { productId: string; quantity: number; reason: string }) => void;
 }) {
   const [form, setForm] = useState({
-    ingredientId: ingredients[0].id,
+    ingredientId: ingredients[0]?.id || '',
     quantity: '',
-    reason: REASONS[0],
-    notes: '',
+    reason: reasons[0] || '',
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -52,61 +49,37 @@ function AddWasteModal({ onClose, onSave }: {
         <div className="px-6 py-4 space-y-4">
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Ingrediente</label>
-            <select value={form.ingredientId} onChange={e => set('ingredientId', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30">
+            <select value={form.ingredientId} onChange={e => set('ingredientId', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
               {ingredients.map(i => <option key={i.id} value={i.id}>{i.name} (Stock: {i.stock} {i.unit})</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Cantidad ({selectedIng?.unit})</label>
-              <input
-                type="number" value={form.quantity} onChange={e => set('quantity', e.target.value)}
-                min="0" step="0.01" placeholder="0.00"
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500/30"
-              />
+              <input type="number" value={form.quantity} onChange={e => set('quantity', e.target.value)} min="0" step="0.01" className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm" />
             </div>
             <div>
               <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Costo estimado</label>
-              <div className="px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/30 text-sm font-semibold text-red-600 dark:text-red-400">
+              <div className="px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 text-sm font-semibold text-red-600">
                 {formatCurrency(cost)}
               </div>
             </div>
           </div>
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Motivo</label>
-            <select value={form.reason} onChange={e => set('reason', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {REASONS.map(r => <option key={r}>{r}</option>)}
+            <select value={form.reason} onChange={e => set('reason', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm">
+              {reasons.map(r => <option key={r}>{r}</option>)}
             </select>
           </div>
         </div>
-
-        {cost > 5000 && (
-          <div className="mx-6 mb-4 flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30 rounded-lg">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              Esta merma tiene un impacto significativo en los costos del día ({formatCurrency(cost)}).
-              Considera revisar los procesos de almacenamiento.
-            </p>
-          </div>
-        )}
-
         <div className="flex gap-3 px-6 py-4 border-t border-slate-200 dark:border-slate-700">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-slate-200 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border text-sm">Cancelar</button>
           <button
             onClick={() => {
               if (!form.quantity || Number(form.quantity) <= 0) { toast.error('Ingresa una cantidad válida'); return; }
-              const ing = ingredients.find(i => i.id === form.ingredientId);
-              onSave({
-                ingredientId: form.ingredientId,
-                quantity: Number(form.quantity),
-                unit: ing?.unit || 'kg',
-                reason: form.reason,
-                date: new Date().toISOString().split('T')[0],
-                cost,
-                userId: 'u2',
-              });
+              onSave({ productId: form.ingredientId, quantity: Number(form.quantity), reason: form.reason });
             }}
-            className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+            className="flex-1 py-2 rounded-lg bg-red-600 text-white text-sm font-medium"
           >
             Registrar Merma
           </button>
@@ -117,11 +90,39 @@ function AddWasteModal({ onClose, onSave }: {
 }
 
 export default function Waste() {
-  const [records, setRecords] = useState<WasteRecord[]>(initialWaste);
+  const { currentUser } = useApp();
+  const [records, setRecords] = useState<WasteRecord[]>([]);
+  const [wasteReasons, setWasteReasons] = useState<string[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const products = await catalogApi.listProducts({ active_only: true });
+      const mappedProducts = products.map(backendProductToIngredient);
+      const wasteRows = await wasteApi.listWasteRecords();
+      const productsById = new Map(mappedProducts.map(p => [p.id, p]));
+      setIngredients(mappedProducts);
+      setRecords(wasteRows.map(row => backendWasteToWasteRecord(row, productsById)));
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'No se pudieron cargar las mermas');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    configApi.listWasteReasons()
+      .then(rows => setWasteReasons(rows.map(r => r.name)))
+      .catch(() => setWasteReasons([]));
+  }, []);
+
   const totalCost = records.reduce((s, r) => s + r.cost, 0);
-  const avgDaily = totalCost / 7;
+  const avgDaily = records.length > 0 ? totalCost / Math.max(1, new Set(records.map(r => r.date)).size) : 0;
 
   const byReason = records.reduce<Record<string, number>>((acc, r) => {
     acc[r.reason] = (acc[r.reason] || 0) + r.cost;
@@ -139,27 +140,35 @@ export default function Waste() {
   }, {});
   const ingData = Object.values(byIngredient).sort((a, b) => b.cost - a.cost);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-24 text-slate-400 text-sm">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Cargando mermas…
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px]">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-slate-900 dark:text-white">Gestión de Mermas</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Control y trazabilidad de pérdidas de inventario</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{records.length} registros desde la API</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+          disabled={ingredients.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />
           Registrar Merma
         </button>
       </div>
 
-      {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Merma Total (período)', value: formatCurrency(totalCost), icon: DollarSign, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
+          { label: 'Merma Total', value: formatCurrency(totalCost), icon: DollarSign, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
           { label: 'Promedio Diario', value: formatCurrency(avgDaily), icon: TrendingDown, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
           { label: 'Total Registros', value: records.length.toString(), icon: Package, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
           { label: 'Ingredientes Afectados', value: Object.keys(byIngredient).length.toString(), icon: AlertTriangle, color: 'text-violet-500', bg: 'bg-violet-50 dark:bg-violet-900/20' },
@@ -169,90 +178,55 @@ export default function Waste() {
               <Icon className={`w-5 h-5 ${color}`} />
             </div>
             <div>
-              <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+              <p className="text-xs text-slate-500">{label}</p>
               <p className="text-lg font-semibold text-slate-900 dark:text-white">{value}</p>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* By reason */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700/50">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Merma por Motivo</h3>
-          <p className="text-xs text-slate-400 mb-4">Costo total acumulado</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={reasonData} layout="vertical" margin={{ left: 100, right: 10, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" strokeOpacity={0.4} horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={v => `$${(v/1000).toFixed(0)}k`} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} width={95} />
-              <Tooltip formatter={(v: number) => formatCurrency(v)} />
-              <Bar dataKey="value" fill="#ef4444" radius={[0, 4, 4, 0]} name="Costo" />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700/50">
+          <h3 className="text-sm font-semibold mb-4">Merma por motivo</h3>
+          {reasonData.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">Sin registros</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={reasonData}>
+                <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
+                <XAxis dataKey="name" tick={{ fontSize: 9 }} interval={0} angle={-15} textAnchor="end" height={50} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Bar dataKey="value" fill="#ef4444" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
-        {/* By ingredient */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-5 shadow-sm border border-slate-200 dark:border-slate-700/50">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Ingredientes más Afectados</h3>
-          <p className="text-xs text-slate-400 mb-4">Por costo de pérdida</p>
-          <div className="space-y-3">
-            {ingData.slice(0, 5).map((item, idx) => {
-              const pct = (item.cost / totalCost) * 100;
-              return (
-                <div key={item.name}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400 w-4">#{idx + 1}</span>
-                      <span className="text-xs font-medium text-slate-800 dark:text-white">{item.name}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-400">{item.qty.toFixed(2)} {item.unit}</span>
-                      <span className="font-semibold text-red-500 dark:text-red-400">{formatCurrency(item.cost)}</span>
-                    </div>
-                  </div>
-                  <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-red-400 rounded-full" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700/50">
+            <h3 className="text-sm font-semibold">Historial de mermas</h3>
           </div>
-        </div>
-      </div>
-
-      {/* Records table */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700/50">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Historial de Mermas</h3>
-          <p className="text-xs text-slate-400 mt-0.5">{records.length} registros · ordenados por fecha</p>
-        </div>
-        <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-700/30 border-b border-slate-200 dark:border-slate-700/50">
-                <th className="text-left px-5 py-3 text-slate-500 dark:text-slate-400 font-medium">Fecha</th>
-                <th className="text-left px-4 py-3 text-slate-500 dark:text-slate-400 font-medium">Ingrediente</th>
-                <th className="text-right px-4 py-3 text-slate-500 dark:text-slate-400 font-medium">Cantidad</th>
-                <th className="text-left px-4 py-3 text-slate-500 dark:text-slate-400 font-medium">Motivo</th>
-                <th className="text-right px-5 py-3 text-slate-500 dark:text-slate-400 font-medium">Costo Pérdida</th>
+              <tr className="bg-slate-50 dark:bg-slate-700/30">
+                <th className="text-left px-4 py-2 text-slate-500">Ingrediente</th>
+                <th className="text-right px-4 py-2 text-slate-500">Cantidad</th>
+                <th className="text-left px-4 py-2 text-slate-500">Motivo</th>
+                <th className="text-right px-4 py-2 text-slate-500">Costo</th>
               </tr>
             </thead>
             <tbody>
-              {records.map(r => {
+              {records.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-8 text-slate-400">Sin mermas registradas</td></tr>
+              ) : records.map(r => {
                 const ing = ingredients.find(i => i.id === r.ingredientId);
                 return (
-                  <tr key={r.id} className="border-b border-slate-100 dark:border-slate-700/30 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
-                    <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{r.date}</td>
-                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">{ing?.name || r.ingredientId}</td>
-                    <td className="text-right px-4 py-3 text-red-500 dark:text-red-400 font-medium">
-                      -{r.quantity} <span className="text-slate-400 font-normal">{r.unit}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-800/30">{r.reason}</span>
-                    </td>
-                    <td className="text-right px-5 py-3 font-semibold text-red-600 dark:text-red-400">{formatCurrency(r.cost)}</td>
+                  <tr key={r.id} className="border-t border-slate-100 dark:border-slate-700/30">
+                    <td className="px-4 py-2">{ing?.name || '—'}</td>
+                    <td className="text-right px-4 py-2">{r.quantity} {r.unit}</td>
+                    <td className="px-4 py-2 text-slate-500">{r.reason}</td>
+                    <td className="text-right px-4 py-2 text-red-500">{formatCurrency(r.cost)}</td>
                   </tr>
                 );
               })}
@@ -263,12 +237,23 @@ export default function Waste() {
 
       {showModal && (
         <AddWasteModal
+          ingredients={ingredients}
+          reasons={wasteReasons}
           onClose={() => setShowModal(false)}
-          onSave={data => {
-            const newRecord: WasteRecord = { id: `w${Date.now()}`, ...data as WasteRecord };
-            setRecords(prev => [newRecord, ...prev]);
-            toast.error(`Merma registrada: ${formatCurrency(data.cost || 0)} de pérdida`);
-            setShowModal(false);
+          onSave={async data => {
+            try {
+              await wasteApi.createWasteRecord({
+                product_id: data.productId,
+                quantity: data.quantity,
+                reason: data.reason,
+                registered_by: currentUser.id,
+              });
+              toast.success('Merma registrada');
+              setShowModal(false);
+              loadData();
+            } catch (error) {
+              toast.error(error instanceof ApiError ? error.message : 'Error al registrar merma');
+            }
           }}
         />
       )}

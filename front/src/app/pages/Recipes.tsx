@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus, Search, ChefHat, X, Trash2, Edit2,
-  TrendingUp, DollarSign, BarChart2, Star
+  TrendingUp, DollarSign, BarChart2, Star, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  recipes as initialRecipes, ingredients, formatCurrency,
-  getRecipeCost, getRecipeMargin, recipeCategories,
-  type Recipe, type RecipeIngredient
+  formatCurrency, getRecipeCost, getRecipeMargin,
+  type Recipe, type RecipeIngredient, type Ingredient,
 } from '../data/mockData';
+import { ApiError, backendProductToIngredient, backendRecipeToRecipe, catalogApi, configApi, recipesApi } from '../api';
+import type { BackendRecipeCategory } from '../api/services/config';
 
 // ─── Profit Indicator ─────────────────────────────────────────────────────────
 
@@ -28,9 +29,9 @@ function ProfitIndicator({ margin }: { margin: number }) {
 
 // ─── Recipe Detail Modal ──────────────────────────────────────────────────────
 
-function RecipeDetailModal({ recipe, onClose }: { recipe: Recipe; onClose: () => void }) {
-  const cost = getRecipeCost(recipe);
-  const margin = getRecipeMargin(recipe);
+function RecipeDetailModal({ recipe, ingredientsById, onClose }: { recipe: Recipe; ingredientsById: Map<string, Ingredient>; onClose: () => void }) {
+  const cost = getRecipeCost(recipe, ingredientsById);
+  const margin = getRecipeMargin(recipe, ingredientsById);
   const profit = recipe.salePrice - cost;
 
   return (
@@ -85,7 +86,7 @@ function RecipeDetailModal({ recipe, onClose }: { recipe: Recipe; onClose: () =>
             <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-3">Desglose de Ingredientes</h4>
             <div className="space-y-2">
               {recipe.ingredients.map((ri, idx) => {
-                const ing = ingredients.find(i => i.id === ri.ingredientId);
+                const ing = ingredientsById.get(ri.ingredientId);
                 if (!ing) return null;
                 const ingCost = ing.costPerUnit * ri.quantity;
                 const pct = (ingCost / cost) * 100;
@@ -117,11 +118,18 @@ function RecipeDetailModal({ recipe, onClose }: { recipe: Recipe; onClose: () =>
 
 // ─── Recipe Builder Modal ─────────────────────────────────────────────────────
 
-function RecipeBuilderModal({ onClose, onSave }: {
+function RecipeBuilderModal({ ingredients, recipeCategories, onClose, onSave }: {
+  ingredients: Ingredient[];
+  recipeCategories: BackendRecipeCategory[];
   onClose: () => void;
-  onSave: (recipe: Partial<Recipe>) => void;
+  onSave: (recipe: Partial<Recipe> & { categoryId?: string }) => void;
 }) {
-  const [form, setForm] = useState({ name: '', category: 'Principales', salePrice: '', description: '' });
+  const [form, setForm] = useState({
+    name: '',
+    category: recipeCategories[0]?.name || '',
+    salePrice: '',
+    description: '',
+  });
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [searchIng, setSearchIng] = useState('');
 
@@ -180,7 +188,7 @@ function RecipeBuilderModal({ onClose, onSave }: {
               <div>
                 <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Categoría</label>
                 <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-                  {recipeCategories.map(c => <option key={c}>{c}</option>)}
+                  {recipeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
               <div>
@@ -222,7 +230,7 @@ function RecipeBuilderModal({ onClose, onSave }: {
             {recipeIngredients.length > 0 && (
               <div className="space-y-2">
                 {recipeIngredients.map(ri => {
-                  const ing = ingredients.find(i => i.id === ri.ingredientId);
+                  const ing = ingredientsById.get(ri.ingredientId);
                   if (!ing) return null;
                   const ingCost = ing.costPerUnit * ri.quantity;
                   return (
@@ -309,7 +317,15 @@ function RecipeBuilderModal({ onClose, onSave }: {
           <button
             onClick={() => {
               if (!form.name || !form.salePrice) { toast.error('Completa los campos requeridos'); return; }
-              onSave({ name: form.name, category: form.category, salePrice: Number(form.salePrice), description: form.description, ingredients: recipeIngredients, active: true });
+              onSave({
+                name: form.name,
+                category: form.category,
+                categoryId: recipeCategories.find(c => c.name === form.category)?.id,
+                salePrice: Number(form.salePrice),
+                description: form.description,
+                ingredients: recipeIngredients,
+                active: true,
+              });
             }}
             className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
           >
@@ -323,9 +339,9 @@ function RecipeBuilderModal({ onClose, onSave }: {
 
 // ─── Recipe Card ──────────────────────────────────────────────────────────────
 
-function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }) {
-  const cost = getRecipeCost(recipe);
-  const margin = getRecipeMargin(recipe);
+function RecipeCard({ recipe, ingredientsById, onClick }: { recipe: Recipe; ingredientsById: Map<string, Ingredient>; onClick: () => void }) {
+  const cost = getRecipeCost(recipe, ingredientsById);
+  const margin = getRecipeMargin(recipe, ingredientsById);
   const profit = recipe.salePrice - cost;
 
   return (
@@ -378,20 +394,68 @@ function RecipeCard({ recipe, onClick }: { recipe: Recipe; onClick: () => void }
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function Recipes() {
-  const [recipeList, setRecipeList] = useState<Recipe[]>(initialRecipes);
+  const [recipeList, setRecipeList] = useState<Recipe[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('Todas');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [catalogRecipeCategories, setCatalogRecipeCategories] = useState<BackendRecipeCategory[]>([]);
+
+  const ingredientsById = useMemo(
+    () => new Map(ingredients.map(i => [i.id, i])),
+    [ingredients],
+  );
+
+  const filterCategories = useMemo(
+    () => [...new Set(recipeList.map(r => r.category).filter(Boolean))],
+    [recipeList],
+  );
+
+  useEffect(() => {
+    configApi.listRecipeCategories()
+      .then(setCatalogRecipeCategories)
+      .catch(() => setCatalogRecipeCategories([]));
+  }, []);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [recipeRows, products] = await Promise.all([
+        recipesApi.listRecipes({ status: 'ACTIVE' }),
+        catalogApi.listProducts({ active_only: true }),
+      ]);
+      setIngredients(products.map(backendProductToIngredient));
+      setRecipeList(recipeRows.map(backendRecipeToRecipe));
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'No se pudieron cargar las recetas');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const filtered = recipeList.filter(r =>
     r.name.toLowerCase().includes(search.toLowerCase()) &&
     (filterCat === 'Todas' || r.category === filterCat)
   );
 
-  const avgMargin = recipeList.reduce((s, r) => s + getRecipeMargin(r), 0) / recipeList.length;
-  const bestRecipe = [...recipeList].sort((a, b) => getRecipeMargin(b) - getRecipeMargin(a))[0];
-  const worstRecipe = [...recipeList].sort((a, b) => getRecipeMargin(a) - getRecipeMargin(b))[0];
+  const avgMargin = recipeList.length
+    ? recipeList.reduce((s, r) => s + getRecipeMargin(r, ingredientsById), 0) / recipeList.length
+    : 0;
+  const bestRecipe = [...recipeList].sort((a, b) => getRecipeMargin(b, ingredientsById) - getRecipeMargin(a, ingredientsById))[0];
+  const worstRecipe = [...recipeList].sort((a, b) => getRecipeMargin(a, ingredientsById) - getRecipeMargin(b, ingredientsById))[0];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-24 text-slate-400 text-sm">
+        <Loader2 className="w-5 h-5 animate-spin" />
+        Cargando recetas…
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px]">
@@ -415,8 +479,8 @@ export default function Recipes() {
         {[
           { label: 'Total Recetas', value: recipeList.length.toString(), icon: ChefHat, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
           { label: 'Margen Promedio', value: `${avgMargin.toFixed(1)}%`, icon: BarChart2, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-          { label: 'Mejor Margen', value: bestRecipe ? `${getRecipeMargin(bestRecipe).toFixed(1)}%` : '-', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', sub: bestRecipe?.name },
-          { label: 'Menor Margen', value: worstRecipe ? `${getRecipeMargin(worstRecipe).toFixed(1)}%` : '-', icon: TrendingUp, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20', sub: worstRecipe?.name },
+          { label: 'Mejor Margen', value: bestRecipe ? `${getRecipeMargin(bestRecipe, ingredientsById).toFixed(1)}%` : '-', icon: Star, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20', sub: bestRecipe?.name },
+          { label: 'Menor Margen', value: worstRecipe ? `${getRecipeMargin(worstRecipe, ingredientsById).toFixed(1)}%` : '-', icon: TrendingUp, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20', sub: worstRecipe?.name },
         ].map(({ label, value, icon: Icon, color, bg, sub }) => (
           <div key={label} className="bg-white dark:bg-slate-800 rounded-xl p-4 shadow-sm border border-slate-200 dark:border-slate-700/50 flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${bg}`}>
@@ -438,7 +502,7 @@ export default function Recipes() {
           <input type="text" placeholder="Buscar receta..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 text-sm bg-transparent outline-none text-slate-700 dark:text-slate-300 placeholder:text-slate-400" />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {['Todas', ...recipeCategories].map(cat => (
+          {['Todas', ...filterCategories].map(cat => (
             <button
               key={cat}
               onClick={() => setFilterCat(cat)}
@@ -457,7 +521,7 @@ export default function Recipes() {
       {/* Recipe grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtered.map(recipe => (
-          <RecipeCard key={recipe.id} recipe={recipe} onClick={() => setSelectedRecipe(recipe)} />
+          <RecipeCard key={recipe.id} recipe={recipe} ingredientsById={ingredientsById} onClick={() => setSelectedRecipe(recipe)} />
         ))}
       </div>
 
@@ -468,15 +532,33 @@ export default function Recipes() {
         </div>
       )}
 
-      {selectedRecipe && <RecipeDetailModal recipe={selectedRecipe} onClose={() => setSelectedRecipe(null)} />}
+      {selectedRecipe && <RecipeDetailModal recipe={selectedRecipe} ingredientsById={ingredientsById} onClose={() => setSelectedRecipe(null)} />}
       {showBuilder && (
         <RecipeBuilderModal
+          ingredients={ingredients}
+          recipeCategories={catalogRecipeCategories}
           onClose={() => setShowBuilder(false)}
-          onSave={data => {
-            const newRecipe: Recipe = { id: `r${Date.now()}`, ...data as Recipe };
-            setRecipeList(prev => [...prev, newRecipe]);
-            toast.success(`Receta "${data.name}" creada exitosamente`);
-            setShowBuilder(false);
+          onSave={async data => {
+            try {
+              const created = await recipesApi.createRecipe({
+                name: data.name!,
+                description: data.description,
+                category_id: data.categoryId,
+                sale_price: data.salePrice!,
+                status: 'ACTIVE',
+              });
+              if (data.ingredients?.length) {
+                await recipesApi.replaceRecipeIngredients(
+                  created.id,
+                  data.ingredients.map(ri => ({ product_id: ri.ingredientId, quantity: ri.quantity })),
+                );
+              }
+              toast.success(`Receta "${data.name}" creada exitosamente`);
+              setShowBuilder(false);
+              loadData();
+            } catch (error) {
+              toast.error(error instanceof ApiError ? error.message : 'Error al crear receta');
+            }
           }}
         />
       )}

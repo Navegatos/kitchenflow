@@ -1,12 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { appUsers, type AppUser } from '../data/mockData';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { type AppUser } from '../domain/types';
+import {
+  authApi,
+  ApiError,
+  loginResponseToAppUser,
+  validateSession,
+  permissionsApi,
+  translateApiError,
+} from '../api';
+import { setPermissionsConfig } from '../auth/permissions';
 
 interface AppContextType {
   darkMode: boolean;
   toggleDarkMode: () => void;
   currentUser: AppUser;
   isAuthenticated: boolean;
-  login: (email: string, password: string, roleHint?: AppUser['role']) => { ok: boolean; message?: string };
+  login: (email: string, password: string) => Promise<{ ok: boolean; message?: string; role?: AppUser['role'] }>;
   logout: () => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (v: boolean) => void;
@@ -14,14 +23,24 @@ interface AppContextType {
   setBranch: (v: string) => void;
 }
 
+const GUEST_USER: AppUser = {
+  id: '',
+  name: 'Invitado',
+  email: '',
+  role: 'WAITER',
+  active: false,
+  lastLogin: '',
+  branch: '',
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUser, setCurrentUser] = useState<AppUser>(appUsers[0]);
-  const [branch, setBranch] = useState(currentUser.branch);
+  const [currentUser, setCurrentUser] = useState<AppUser>(GUEST_USER);
+  const [branch, setBranch] = useState('');
 
   useEffect(() => {
     const root = document.documentElement;
@@ -36,27 +55,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBranch(currentUser.branch);
   }, [currentUser]);
 
+  useEffect(() => {
+    permissionsApi.getPermissionsConfig()
+      .then(setPermissionsConfig)
+      .catch(() => { /* permisos opcionales al arranque */ });
+
+    validateSession().then(session => {
+      if (!session) return;
+      setCurrentUser(loginResponseToAppUser(session));
+      setIsAuthenticated(true);
+    });
+  }, []);
+
   const toggleDarkMode = () => setDarkMode(prev => !prev);
 
-  const login = (email: string, password: string, roleHint?: AppUser['role']) => {
-    if (!email || !password) return { ok: false, message: 'Completa correo y contraseña' };
-    if (password.length < 4) return { ok: false, message: 'La contraseña debe tener al menos 4 caracteres' };
+  const login = useCallback(async (email: string, password: string) => {
+    if (!email || !password) {
+      return { ok: false, message: 'Completa correo y contraseña' };
+    }
 
-    const byEmail = appUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
-    const byRole = roleHint ? appUsers.find(u => u.role === roleHint && u.active) : undefined;
-    const selected = byEmail || byRole || appUsers[0];
+    try {
+      const session = await authApi.login(email, password);
+      const user = loginResponseToAppUser(session);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      return { ok: true, role: user.role };
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : translateApiError(
+              error instanceof Error ? error.message : 'Error de conexión',
+            );
+      return { ok: false, message };
+    }
+  }, []);
 
-    if (!selected.active) return { ok: false, message: 'El usuario está deshabilitado' };
-
-    setCurrentUser(selected);
-    setIsAuthenticated(true);
-    return { ok: true };
-  };
-
-  const logout = () => {
+  const logout = useCallback(() => {
+    authApi.logout();
     setIsAuthenticated(false);
-    setCurrentUser(appUsers[0]);
-  };
+    setCurrentUser(GUEST_USER);
+  }, []);
 
   return (
     <AppContext.Provider

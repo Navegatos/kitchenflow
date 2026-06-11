@@ -4,6 +4,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useApp } from '../../context/AppContext';
 import { Toaster } from 'sonner';
+import { canAccessPath, getHomePath } from '../../auth/permissions';
 
 const pageTitles: Record<string, string> = {
   '/':              'Dashboard',
@@ -21,9 +22,13 @@ const pageTitles: Record<string, string> = {
 
 function RootInner() {
   const location = useLocation();
-  const { isAuthenticated } = useApp();
+  const { isAuthenticated, currentUser } = useApp();
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (!canAccessPath(currentUser.role, location.pathname)) {
+    return <Navigate to={getHomePath(currentUser.role)} replace />;
+  }
 
   const title = pageTitles[location.pathname] || 'KitchenFlow';
 

@@ -46,6 +46,7 @@ def create_recipe(body: dict, db: Session = Depends(get_db)) -> dict:
         sale_price=Decimal(str(body["sale_price"])),
         created_by=UUID(body["created_by"]) if body.get("created_by") else None,
         status=body.get("status", "ACTIVE"),
+        category_id=UUID(body["category_id"]) if body.get("category_id") else None,
     )
 
 
@@ -59,6 +60,8 @@ def patch_recipe(recipe_id: UUID, body: dict, db: Session = Depends(get_db)) -> 
         preparation_time_minutes=body.get("preparation_time_minutes"),
         sale_price=(Decimal(str(body["sale_price"])) if "sale_price" in body else None),
         status=body.get("status"),
+        category_id=UUID(body["category_id"]) if body.get("category_id") else None,
+        clear_category=body.get("clear_category", False),
     )
 
 
