@@ -3,8 +3,8 @@ import { type AppUser } from '../domain/types';
 import {
   authApi,
   ApiError,
-  getStoredSession,
   loginResponseToAppUser,
+  validateSession,
   permissionsApi,
   translateApiError,
 } from '../api';
@@ -60,10 +60,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .then(setPermissionsConfig)
       .catch(() => { /* permisos opcionales al arranque */ });
 
-    const session = getStoredSession();
-    if (!session) return;
-    setCurrentUser(loginResponseToAppUser(session));
-    setIsAuthenticated(true);
+    validateSession().then(session => {
+      if (!session) return;
+      setCurrentUser(loginResponseToAppUser(session));
+      setIsAuthenticated(true);
+    });
   }, []);
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);

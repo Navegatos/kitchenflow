@@ -32,6 +32,8 @@ async def authenticate_user(email: str, password: str, db: Session) -> dict:
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    if not user.active:
+        raise HTTPException(status_code=403, detail="Usuario desactivado")
     if not verify_password(password, user.password_hash):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
     return user
@@ -56,10 +58,17 @@ def build_login_token_payload(user: User, *, branch_name: str | None = None) -> 
         "exp": (datetime.now() + timedelta(hours=1)).isoformat(),
     }
 
-def get_current_user_from_token_claims(user_id: UUID) -> dict:
+def get_current_user_from_token_claims(user_id: UUID, db: Session) -> dict:
     """
-    Esperado:
-    - Cargar usuario desde BD por UUID; rechazar si inactivo o inexistente.
-    - Será llamado por dependencias `Depends()` en rutas protegidas.
+    Carga usuario desde BD por UUID; rechaza si inactivo o inexistente.
+    Usado por `/auth/me` y futuras dependencias `Depends()` en rutas protegidas.
     """
-    raise HTTPException(status_code=501, detail="get_current_user_from_token_claims: pendiente")
+    from app.services import config_service
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    if not user.active:
+        raise HTTPException(status_code=403, detail="Usuario desactivado")
+    branch_name = config_service.get_branch_name(db, user.branch_id)
+    return build_login_token_payload(user, branch_name=branch_name)

@@ -30,3 +30,18 @@ export async function login(email: string, password: string): Promise<LoginRespo
 export function logout(): void {
   clearSession();
 }
+
+/** Revalida la sesión local contra el backend (usuario activo y existente). */
+export async function validateSession(): Promise<LoginResponse | null> {
+  const session = getStoredSession();
+  if (!session?.sub) return null;
+
+  try {
+    const data = await api.get<LoginResponse>('/auth/me', { user_id: session.sub });
+    storeSession(data);
+    return data;
+  } catch {
+    clearSession();
+    return null;
+  }
+}

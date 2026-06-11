@@ -3,6 +3,7 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
   'User not found': 'Usuario no encontrado',
   'Not authenticated': 'Sesión no válida',
   'Could not validate credentials': 'No se pudieron validar las credenciales',
+  'Usuario desactivado': 'Tu cuenta fue desactivada. Contacta al administrador.',
 };
 
 export function translateApiError(message: string): string {

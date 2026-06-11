@@ -3,7 +3,7 @@ export { translateApiError } from './errors';
 export { api, apiRequest, ApiError, checkBackendHealth } from './client';
 export * from './types';
 export * from './mappers';
-export { getStoredSession, storeSession, clearSession, login, logout } from './auth';
+export { getStoredSession, storeSession, clearSession, login, logout, validateSession } from './auth';
 export * as authApi from './auth';
 export * as usersApi from './services/users';
 export * as catalogApi from './services/catalog';
