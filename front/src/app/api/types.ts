@@ -11,6 +11,8 @@ export interface LoginResponse {
   first_name: string;
   last_name: string;
   role: BackendRole;
+  branch_id?: string | null;
+  branch_name?: string | null;
   exp?: string;
 }
 
@@ -20,6 +22,8 @@ export interface BackendUser {
   first_name: string;
   last_name: string;
   role: BackendRole;
+  branch_id?: string | null;
+  branch_name?: string | null;
   active: boolean;
   created_at?: string | null;
   updated_at?: string | null;
@@ -88,6 +92,8 @@ export interface BackendRecipe {
   id: string;
   name: string;
   description?: string | null;
+  category_id?: string | null;
+  category_name?: string | null;
   preparation_time_minutes?: number | null;
   sale_price?: string | null;
   status?: BackendRecipeStatus;
@@ -146,6 +152,12 @@ export interface DailyFinanceRow {
 export interface SalesAggregateRow {
   recipe_id: string;
   recipe_name: string;
+  category_id?: string | null;
+  category_name?: string | null;
   quantity_sold: number;
   revenue?: string | null;
+  unit_cost?: string | null;
+  total_cost?: string | null;
+  profit?: string | null;
+  margin_percent?: string | null;
 }

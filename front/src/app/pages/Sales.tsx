@@ -63,15 +63,18 @@ export default function Sales() {
       .map(row => {
         const revenue = parseDecimal(row.revenue);
         const qty = row.quantity_sold;
+        const cost = parseDecimal(row.total_cost);
+        const profit = parseDecimal(row.profit, revenue - cost);
+        const margin = parseDecimal(row.margin_percent, revenue > 0 ? (profit / revenue) * 100 : 0);
         return {
           id: row.recipe_id,
           name: row.recipe_name,
-          category: 'Platos',
+          category: row.category_name || 'Sin categoría',
           qty,
           revenue,
-          cost: 0,
-          profit: revenue,
-          margin: 100,
+          cost,
+          profit,
+          margin,
         };
       })
       .sort((a, b) => b.revenue - a.revenue);

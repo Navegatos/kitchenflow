@@ -22,8 +22,11 @@ async def login(body: LoginBody, db: Session = Depends(get_db)) -> dict:
     """
     Valida credenciales y debe devolver token (JWT) y metadatos mínimos del usuario.
     """
+    from app.services import config_service
+
     user = await auth_service.authenticate_user(body.email, body.password, db)
-    return auth_service.build_login_token_payload(user)
+    branch_name = config_service.get_branch_name(db, user.branch_id)
+    return auth_service.build_login_token_payload(user, branch_name=branch_name)
 
 
 @router.get("/me")

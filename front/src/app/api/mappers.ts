@@ -58,7 +58,7 @@ export function loginResponseToAppUser(data: LoginResponse): AppUser {
     role: mapBackendRole(data.role),
     active: true,
     lastLogin: new Date().toLocaleString('es-CL'),
-    branch: '',
+    branch: data.branch_name || '',
   };
 }
 
@@ -70,7 +70,7 @@ export function backendUserToAppUser(user: BackendUser): AppUser {
     role: mapBackendRole(user.role),
     active: user.active,
     lastLogin: user.updated_at ? new Date(user.updated_at).toLocaleString('es-CL') : '—',
-    branch: '',
+    branch: user.branch_name || '',
   };
 }
 
@@ -140,7 +140,7 @@ export function backendRecipeToRecipe(recipe: BackendRecipe): Recipe {
   return {
     id: recipe.id,
     name: recipe.name,
-    category: 'Platos',
+    category: recipe.category_name || 'Sin categoría',
     salePrice: parseDecimal(recipe.sale_price),
     description: recipe.description || '',
     ingredients,

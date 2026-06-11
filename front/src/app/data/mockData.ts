@@ -18,6 +18,5 @@ export {
   dateRangeDays,
   formatDisplayDate,
   parseDecimal,
-  PRODUCT_UNITS,
   mapFinanceRows,
 } from '../domain/types';

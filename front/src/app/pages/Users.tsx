@@ -5,9 +5,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { type AppUser } from '../domain/types';
-import { ApiError, backendUserToAppUser, usersApi } from '../api';
+import { ApiError, backendUserToAppUser, configApi, usersApi } from '../api';
+import type { BackendBranch } from '../api/services/config';
 import type { BackendRole } from '../api/types';
-import { ROLE_LABELS } from '../auth/permissions';
+import { getFeaturePermissions, getRoleLabels } from '../auth/permissions';
 
 function RoleBadge({ role }: { role: BackendRole }) {
   const styles: Record<BackendRole, string> = {
@@ -19,7 +20,7 @@ function RoleBadge({ role }: { role: BackendRole }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${styles[role]}`}>
       {role === 'ADMIN' || role === 'MANAGER' ? <Shield className="w-2.5 h-2.5" /> : <User className="w-2.5 h-2.5" />}
-      {ROLE_LABELS[role]}
+      {getRoleLabels()[role]}
     </span>
   );
 }
@@ -30,10 +31,11 @@ function StatusBadge({ active }: { active: boolean }) {
     : <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"><XCircle className="w-2.5 h-2.5" />Inactivo</span>;
 }
 
-function UserModal({ user, onClose, onSave, saving }: {
+function UserModal({ user, branches, onClose, onSave, saving }: {
   user?: AppUser;
+  branches: BackendBranch[];
   onClose: () => void;
-  onSave: (data: Partial<AppUser> & { password?: string }) => void;
+  onSave: (data: Partial<AppUser> & { password?: string; branch_id?: string | null }) => void;
   saving?: boolean;
 }) {
   const [form, setForm] = useState({
@@ -42,7 +44,7 @@ function UserModal({ user, onClose, onSave, saving }: {
     password: '',
     role: user?.role || 'WAITER' as BackendRole,
     active: user?.active ?? true,
-    branch: user?.branch || '',
+    branch_id: branches.find(b => b.name === user?.branch)?.id || branches[0]?.id || '',
   });
   const set = (k: string, v: any) => setForm(p => ({ ...p, [k]: v }));
 
@@ -78,17 +80,22 @@ function UserModal({ user, onClose, onSave, saving }: {
                   }`}
                 >
                   {role === 'ADMIN' || role === 'MANAGER' ? <Shield className="w-4 h-4" /> : <User className="w-4 h-4" />}
-                  {ROLE_LABELS[role]}
+                  {getRoleLabels()[role]}
                 </button>
               ))}
             </div>
           </div>
-          {form.branch && (
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Sucursal</label>
-            <input type="text" value={form.branch} disabled className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-sm text-slate-500" />
+            <select
+              value={form.branch_id}
+              onChange={e => set('branch_id', e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none"
+            >
+              <option value="">Sin sucursal</option>
+              {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
           </div>
-          )}
           <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg">
             <div>
               <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Estado del usuario</p>
@@ -129,6 +136,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [editingUser, setEditingUser] = useState<AppUser | undefined>();
   const [showModal, setShowModal] = useState(false);
+  const [branches, setBranches] = useState<BackendBranch[]>([]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -144,6 +152,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers();
+    configApi.listBranches().then(setBranches).catch(() => setBranches([]));
   }, [loadUsers]);
 
   const filtered = users.filter(u =>
@@ -157,17 +166,14 @@ export default function UsersPage() {
   const waiters = users.filter(u => u.role === 'WAITER').length;
   const activeCount = users.filter(u => u.active).length;
 
-  const permissionRows: Record<string, Record<BackendRole, boolean>> = {
-    'Ver Dashboard':           { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
-    'Gestionar Inventario':    { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
-    'Registrar Movimientos':   { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
-    'Gestionar Recetas':       { ADMIN: true, MANAGER: true, CHEF: true, WAITER: false },
-    'Ver Finanzas':            { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
-    'Ver Ventas (Toteat)':     { ADMIN: true, MANAGER: true, CHEF: false, WAITER: false },
-    'Registrar Mermas':        { ADMIN: true, MANAGER: true, CHEF: true, WAITER: true },
-    'Gestionar Usuarios':      { ADMIN: true, MANAGER: false, CHEF: false, WAITER: false },
-    'Configuración':           { ADMIN: true, MANAGER: false, CHEF: false, WAITER: false },
-  };
+  const featurePermissions = getFeaturePermissions();
+  const permissionRows = featurePermissions
+    ? Object.entries(featurePermissions).map(([key, item]) => ({
+        key,
+        label: item.label,
+        roles: item.roles,
+      }))
+    : [];
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px]">
@@ -291,12 +297,12 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {Object.entries(permissionRows).map(([func, perms]) => (
-                  <tr key={func} className="border-b border-slate-100 dark:border-slate-700/30">
-                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{func}</td>
+                {permissionRows.map(({ key, label, roles }) => (
+                  <tr key={key} className="border-b border-slate-100 dark:border-slate-700/30">
+                    <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{label}</td>
                     {(['ADMIN', 'MANAGER', 'CHEF', 'WAITER'] as const).map(role => (
                       <td key={role} className="text-center px-3 py-2.5">
-                        {perms[role] ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : <XCircle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
+                        {roles[role] ? <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mx-auto" /> : <XCircle className="w-3.5 h-3.5 text-slate-300 mx-auto" />}
                       </td>
                     ))}
                   </tr>
@@ -310,13 +316,21 @@ export default function UsersPage() {
       {showModal && (
         <UserModal
           user={editingUser}
+          branches={branches}
           saving={saving}
           onClose={() => setShowModal(false)}
           onSave={async data => {
             setSaving(true);
             try {
+              const branchId = (data as { branch_id?: string }).branch_id || null;
               if (editingUser) {
-                const updated = await usersApi.updateUser(editingUser.id, data);
+                const updated = await usersApi.updateUser(editingUser.id, {
+                  name: data.name,
+                  email: data.email,
+                  role: data.role,
+                  active: data.active,
+                  branch_id: branchId,
+                });
                 setUsers(prev => prev.map(u => (u.id === editingUser.id ? backendUserToAppUser(updated) : u)));
                 toast.success('Usuario actualizado correctamente');
               } else {
@@ -325,6 +339,7 @@ export default function UsersPage() {
                   email: data.email!,
                   password: data.password || 'changeme',
                   role: data.role || 'WAITER',
+                  branch_id: branchId || undefined,
                 });
                 setUsers(prev => [...prev, backendUserToAppUser(created)]);
                 toast.success(`Usuario "${data.name}" creado correctamente`);

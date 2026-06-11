@@ -186,23 +186,48 @@ def aggregate_sales_for_report(
     if recipe_id is not None:
         q = q.filter(OrderItem.recipe_id == recipe_id)
 
+    from app.services import config_service, recipes_service
+
     totals: dict[tuple[str, str], dict] = {}
     for item, recipe_name, order in q.all():
         key = (str(item.recipe_id), recipe_name)
         if key not in totals:
+            recipe = db.query(Recipe).filter(Recipe.id == item.recipe_id).first()
+            cost_data = recipes_service.estimate_recipe_cost(db, item.recipe_id)
+            unit_cost = Decimal(str(cost_data["estimated_cost"]))
             totals[key] = {
                 "recipe_id": str(item.recipe_id),
                 "recipe_name": recipe_name,
+                "category_id": str(recipe.category_id) if recipe and recipe.category_id else None,
+                "category_name": (
+                    config_service.get_recipe_category_name(db, recipe.category_id)
+                    if recipe
+                    else None
+                ),
+                "unit_cost": unit_cost,
                 "quantity_sold": 0,
                 "revenue": Decimal("0"),
             }
         totals[key]["quantity_sold"] += item.quantity
         totals[key]["revenue"] += Decimal(str(item.subtotal))
 
-    return [
-        {
-            **row,
-            "revenue": decimal_str(row["revenue"]),
-        }
-        for row in sorted(totals.values(), key=lambda x: x["recipe_name"])
-    ]
+    result = []
+    for row in sorted(totals.values(), key=lambda x: x["recipe_name"]):
+        qty = row["quantity_sold"]
+        revenue = row["revenue"]
+        total_cost = row["unit_cost"] * qty
+        profit = revenue - total_cost
+        margin_pct = (profit / revenue * 100) if revenue > 0 else Decimal("0")
+        result.append({
+            "recipe_id": row["recipe_id"],
+            "recipe_name": row["recipe_name"],
+            "category_id": row["category_id"],
+            "category_name": row["category_name"],
+            "quantity_sold": qty,
+            "revenue": decimal_str(revenue),
+            "unit_cost": decimal_str(row["unit_cost"]),
+            "total_cost": decimal_str(total_cost),
+            "profit": decimal_str(profit),
+            "margin_percent": str(margin_pct.quantize(Decimal("0.01"))),
+        })
+    return result

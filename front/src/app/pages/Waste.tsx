@@ -9,25 +9,20 @@ import { toast } from 'sonner';
 import { formatCurrency, type Ingredient, type WasteRecord } from '../data/mockData';
 import {
   ApiError, backendProductToIngredient, backendWasteToWasteRecord,
-  catalogApi, wasteApi,
+  catalogApi, configApi, wasteApi,
 } from '../api';
 import { useApp } from '../context/AppContext';
 
-const REASONS = [
-  'Vencimiento', 'Deterioro por calor', 'Cadena de frío rota',
-  'Deterioro por humedad', 'Carne no vendida', 'Deterioro', 'Error de cocción',
-  'Sobreproducción', 'Accidente', 'Otro'
-];
-
-function AddWasteModal({ ingredients, onClose, onSave }: {
+function AddWasteModal({ ingredients, reasons, onClose, onSave }: {
   ingredients: Ingredient[];
+  reasons: string[];
   onClose: () => void;
   onSave: (data: { productId: string; quantity: number; reason: string }) => void;
 }) {
   const [form, setForm] = useState({
     ingredientId: ingredients[0]?.id || '',
     quantity: '',
-    reason: REASONS[0],
+    reason: reasons[0] || '',
   });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
@@ -73,7 +68,7 @@ function AddWasteModal({ ingredients, onClose, onSave }: {
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Motivo</label>
             <select value={form.reason} onChange={e => set('reason', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm">
-              {REASONS.map(r => <option key={r}>{r}</option>)}
+              {reasons.map(r => <option key={r}>{r}</option>)}
             </select>
           </div>
         </div>
@@ -97,6 +92,7 @@ function AddWasteModal({ ingredients, onClose, onSave }: {
 export default function Waste() {
   const { currentUser } = useApp();
   const [records, setRecords] = useState<WasteRecord[]>([]);
+  const [wasteReasons, setWasteReasons] = useState<string[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -118,6 +114,12 @@ export default function Waste() {
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    configApi.listWasteReasons()
+      .then(rows => setWasteReasons(rows.map(r => r.name)))
+      .catch(() => setWasteReasons([]));
+  }, []);
 
   const totalCost = records.reduce((s, r) => s + r.cost, 0);
   const avgDaily = records.length > 0 ? totalCost / Math.max(1, new Set(records.map(r => r.date)).size) : 0;
@@ -236,6 +238,7 @@ export default function Waste() {
       {showModal && (
         <AddWasteModal
           ingredients={ingredients}
+          reasons={wasteReasons}
           onClose={() => setShowModal(false)}
           onSave={async data => {
             try {

@@ -32,7 +32,7 @@ export default function Menu() {
             return {
               id: recipe.id,
               name: recipe.name,
-              category: 'Platos',
+              category: recipe.category_name || 'Sin categoría',
               cost,
               price,
               margin,

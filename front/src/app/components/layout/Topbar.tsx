@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, Sun, Moon, Search, ChevronDown, LogOut, User, Settings } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { ROLE_LABELS } from '../../auth/permissions';
+import { getRoleLabels } from '../../auth/permissions';
 import { backendProductToIngredient, inventoryApi, parseDecimal } from '../../api';
 import type { BackendProduct } from '../../api/types';
 
@@ -113,7 +113,7 @@ export function Topbar({ title }: { title?: string }) {
           </div>
           <div className="hidden md:block text-left">
             <p className="text-xs font-medium text-slate-900 dark:text-white leading-tight">{currentUser.name.split(' ')[0]}</p>
-            <p className="text-xs text-slate-400 leading-tight">{ROLE_LABELS[currentUser.role]}</p>
+            <p className="text-xs text-slate-400 leading-tight">{getRoleLabels()[currentUser.role]}</p>
           </div>
           <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
         </button>

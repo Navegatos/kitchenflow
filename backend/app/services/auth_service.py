@@ -37,19 +37,23 @@ async def authenticate_user(email: str, password: str, db: Session) -> dict:
     return user
 
 
-def build_login_token_payload(user: User) -> dict:
+def build_login_token_payload(user: User, *, branch_name: str | None = None) -> dict:
     """
     Esperado:
     - Construir payload del JWT (sub=user id UUID, rol, exp, etc.).
     - No debe incluir el hash de contraseña.
     """
+    from app.services.serializers import enum_val, uuid_str
+
     return {
-        "sub": user.id,
+        "sub": uuid_str(user.id),
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "role": user.role,
-        "exp": datetime.now() + timedelta(hours=1)
+        "role": enum_val(user.role),
+        "branch_id": uuid_str(user.branch_id),
+        "branch_name": branch_name,
+        "exp": (datetime.now() + timedelta(hours=1)).isoformat(),
     }
 
 def get_current_user_from_token_claims(user_id: UUID) -> dict:

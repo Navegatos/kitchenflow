@@ -12,3 +12,6 @@ export * as recipesApi from './services/recipes';
 export * as ordersApi from './services/orders';
 export * as wasteApi from './services/waste';
 export * as reportsApi from './services/reports';
+export * as configApi from './services/config';
+export * as settingsApi from './services/settings';
+export * as permissionsApi from './services/permissions';

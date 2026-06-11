@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  formatCurrency, isLowStock, PRODUCT_UNITS,
+  formatCurrency, isLowStock,
   type Ingredient, type StockMovement,
 } from '../data/mockData';
 import {
@@ -13,6 +13,7 @@ import {
   backendMovementToStockMovement,
   backendProductToIngredient,
   catalogApi,
+  configApi,
   inventoryApi,
   mapMovementTypeToBack,
 } from '../api';
@@ -125,12 +126,16 @@ function AddStockModal({ item, onClose, onSave }: {
 
 // ─── Add Ingredient Modal ─────────────────────────────────────────────────────
 
-function AddIngredientModal({ categories, onClose, onSave }: {
+function AddIngredientModal({ categories, units, onClose, onSave }: {
   categories: string[];
+  units: string[];
   onClose: () => void;
   onSave: (data: Partial<Ingredient>) => void;
 }) {
-  const [form, setForm] = useState({ name: '', unit: 'kg', category: categories[0] || 'Sin categoría', stock: '', minStock: '', costPerUnit: '', supplier: '' });
+  const [form, setForm] = useState({
+    name: '', unit: units[0] || 'kg', category: categories[0] || 'Sin categoría',
+    stock: '', minStock: '', costPerUnit: '', supplier: '',
+  });
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
   return (
@@ -164,7 +169,7 @@ function AddIngredientModal({ categories, onClose, onSave }: {
           <div>
             <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Unidad</label>
             <select value={form.unit} onChange={e => set('unit', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-              {PRODUCT_UNITS.map(u => <option key={u}>{u}</option>)}
+              {(units.length > 0 ? units : ['kg']).map(u => <option key={u}>{u}</option>)}
             </select>
           </div>
           <div>
@@ -209,6 +214,13 @@ export default function Inventory() {
   const [selectedItem, setSelectedItem] = useState<Ingredient | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [productUnits, setProductUnits] = useState<string[]>([]);
+
+  useEffect(() => {
+    configApi.listProductUnits()
+      .then(units => setProductUnits(units.map(u => u.code)))
+      .catch(() => setProductUnits([]));
+  }, []);
 
   const productsById = useMemo(
     () => new Map(items.map(item => [item.id, item])),
@@ -484,6 +496,7 @@ export default function Inventory() {
       {showAddModal && (
         <AddIngredientModal
           categories={categories}
+          units={productUnits}
           onClose={() => setShowAddModal(false)}
           onSave={async (data) => {
             try {

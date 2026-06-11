@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.products_catalog_model import Product
 from app.models.waste_model import WasteRecord
+from app.services import config_service
 from app.services.serializers import decimal_str, dt_iso, uuid_str
 
 
@@ -69,6 +70,8 @@ def register_waste(
 
     if quantity <= 0:
         raise HTTPException(status_code=400, detail="quantity debe ser mayor a 0")
+    if reason:
+        reason = config_service.validate_waste_reason(db, reason)
 
     product = db.query(Product).filter(Product.id == product_id).with_for_update().first()
     if not product:

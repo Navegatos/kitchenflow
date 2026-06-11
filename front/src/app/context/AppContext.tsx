@@ -5,8 +5,10 @@ import {
   ApiError,
   getStoredSession,
   loginResponseToAppUser,
+  permissionsApi,
   translateApiError,
 } from '../api';
+import { setPermissionsConfig } from '../auth/permissions';
 
 interface AppContextType {
   darkMode: boolean;
@@ -54,6 +56,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [currentUser]);
 
   useEffect(() => {
+    permissionsApi.getPermissionsConfig()
+      .then(setPermissionsConfig)
+      .catch(() => { /* permisos opcionales al arranque */ });
+
     const session = getStoredSession();
     if (!session) return;
     setCurrentUser(loginResponseToAppUser(session));

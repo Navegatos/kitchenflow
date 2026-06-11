@@ -15,6 +15,7 @@ export async function createUser(data: {
   email: string;
   password: string;
   role: BackendRole;
+  branch_id?: string;
 }): Promise<BackendUser> {
   const { first_name, last_name } = splitFullName(data.name);
   return api.post<BackendUser>('/users', {
@@ -23,12 +24,13 @@ export async function createUser(data: {
     last_name,
     password: data.password,
     role: data.role,
+    ...(data.branch_id ? { branch_id: data.branch_id } : {}),
   });
 }
 
 export async function updateUser(
   userId: string,
-  data: Partial<{ name: string; email: string; role: BackendRole; active: boolean }>,
+  data: Partial<{ name: string; email: string; role: BackendRole; active: boolean; branch_id: string | null }>,
 ): Promise<BackendUser> {
   const body: Record<string, unknown> = {};
   if (data.name) {
@@ -39,6 +41,10 @@ export async function updateUser(
   if (data.email !== undefined) body.email = data.email;
   if (data.role !== undefined) body.role = data.role;
   if (data.active !== undefined) body.active = data.active;
+  if (data.branch_id !== undefined) {
+    if (data.branch_id === null || data.branch_id === '') body.clear_branch = true;
+    else body.branch_id = data.branch_id;
+  }
   return api.patch<BackendUser>(`/users/${userId}`, body);
 }
 

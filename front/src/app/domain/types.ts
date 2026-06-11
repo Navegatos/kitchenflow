@@ -128,8 +128,6 @@ export function parseDecimal(value: string | number | null | undefined, fallback
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export const PRODUCT_UNITS = ['kg', 'gr', 'lt', 'ml', 'unidad', 'porción', 'taza'];
-
 export function mapFinanceRows(
   rows: Array<{ date: string; revenue?: string | null; waste_cost?: string | null; estimated_profit?: string | null }>,
 ): DailyFinancial[] {

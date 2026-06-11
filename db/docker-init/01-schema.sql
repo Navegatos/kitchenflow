@@ -36,6 +36,15 @@ CREATE TYPE supplier_status AS ENUM (
     'INACTIVE'
 );
 
+CREATE TABLE branches (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) NOT NULL UNIQUE,
+    address TEXT,
+    phone VARCHAR(50),
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     first_name VARCHAR(100) NOT NULL,
@@ -43,6 +52,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role user_role NOT NULL DEFAULT 'WAITER',
+    branch_id UUID REFERENCES branches(id),
     active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -95,10 +105,87 @@ CREATE TABLE inventory_movements (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE recipe_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(120) NOT NULL UNIQUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE product_units (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) NOT NULL UNIQUE,
+    label VARCHAR(100) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE waste_reasons (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) NOT NULL UNIQUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE lookup_options (
+    group_key VARCHAR(50) NOT NULL,
+    value VARCHAR(100) NOT NULL,
+    label VARCHAR(200) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (group_key, value)
+);
+
+CREATE TABLE permission_features (
+    key VARCHAR(100) PRIMARY KEY,
+    label VARCHAR(200) NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE role_feature_permissions (
+    role user_role NOT NULL,
+    feature_key VARCHAR(100) NOT NULL REFERENCES permission_features(key) ON DELETE CASCADE,
+    allowed BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (role, feature_key)
+);
+
+CREATE TABLE route_permissions (
+    path VARCHAR(200) NOT NULL,
+    role user_role NOT NULL,
+    PRIMARY KEY (path, role)
+);
+
+CREATE TABLE app_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    business_name VARCHAR(200) NOT NULL DEFAULT '',
+    business_address TEXT,
+    business_phone VARCHAR(50),
+    business_email VARCHAR(255),
+    business_rut VARCHAR(50),
+    business_category VARCHAR(100),
+    currency VARCHAR(10) NOT NULL DEFAULT 'CLP',
+    tax_rate NUMERIC(5,2) NOT NULL DEFAULT 19,
+    tax_name VARCHAR(50) NOT NULL DEFAULT 'IVA',
+    include_vat BOOLEAN NOT NULL DEFAULT TRUE,
+    margin_target NUMERIC(5,2) NOT NULL DEFAULT 65,
+    waste_alert NUMERIC(5,2) NOT NULL DEFAULT 5,
+    toteat_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    toteat_api_key TEXT,
+    toteat_sync VARCHAR(20) NOT NULL DEFAULT 'auto',
+    webhook_url TEXT,
+    notify_low_stock BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_high_waste BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_daily_report BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_weekly_report BOOLEAN NOT NULL DEFAULT FALSE,
+    notify_profit_alert BOOLEAN NOT NULL DEFAULT TRUE,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE recipes (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(150) NOT NULL,
     description TEXT,
+    category_id UUID REFERENCES recipe_categories(id),
     preparation_time_minutes INTEGER,
     sale_price NUMERIC(12,2) NOT NULL,
     status recipe_status NOT NULL DEFAULT 'ACTIVE',
@@ -145,6 +232,8 @@ CREATE TABLE waste_records (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE INDEX idx_users_branch_id ON users(branch_id);
+CREATE INDEX idx_recipes_category_id ON recipes(category_id);
 CREATE INDEX idx_products_category_id ON products(category_id);
 CREATE INDEX idx_products_supplier_id ON products(supplier_id);
 CREATE INDEX idx_inventory_movements_product_id ON inventory_movements(product_id);
@@ -178,5 +267,10 @@ CREATE TRIGGER update_recipes_updated_at
 
 CREATE TRIGGER update_orders_updated_at
     BEFORE UPDATE ON orders
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_app_settings_updated_at
+    BEFORE UPDATE ON app_settings
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();

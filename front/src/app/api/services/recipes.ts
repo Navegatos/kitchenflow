@@ -20,6 +20,7 @@ export async function getRecipeCost(recipeId: string): Promise<{ estimated_cost?
 export async function createRecipe(data: {
   name: string;
   description?: string;
+  category_id?: string;
   preparation_time_minutes?: number;
   sale_price: number;
   created_by?: string;
@@ -36,6 +37,7 @@ export async function updateRecipe(
     preparation_time_minutes: number;
     sale_price: number;
     status: string;
+    category_id: string;
   }>,
 ): Promise<BackendRecipe> {
   return api.patch<BackendRecipe>(`/recipes/${recipeId}`, data);

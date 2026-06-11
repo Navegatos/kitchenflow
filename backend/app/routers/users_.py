@@ -34,6 +34,7 @@ def create_user(ep: dict, db: Session = Depends(get_db)) -> dict:
         last_name=ep["last_name"],
         password_plain=ep["password"],
         role=ep["role"],
+        branch_id=UUID(ep["branch_id"]) if ep.get("branch_id") else None,
     )
 
 
@@ -47,6 +48,8 @@ def patch_user(user_id: UUID, ep: dict, db: Session = Depends(get_db)) -> dict:
         email=ep.get("email"),
         role=ep.get("role"),
         active=ep.get("active"),
+        branch_id=UUID(ep["branch_id"]) if ep.get("branch_id") else None,
+        clear_branch=ep.get("clear_branch", False),
     )
 
 

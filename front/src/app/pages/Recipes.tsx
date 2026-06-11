@@ -8,7 +8,8 @@ import {
   formatCurrency, getRecipeCost, getRecipeMargin,
   type Recipe, type RecipeIngredient, type Ingredient,
 } from '../data/mockData';
-import { ApiError, backendProductToIngredient, backendRecipeToRecipe, catalogApi, recipesApi } from '../api';
+import { ApiError, backendProductToIngredient, backendRecipeToRecipe, catalogApi, configApi, recipesApi } from '../api';
+import type { BackendRecipeCategory } from '../api/services/config';
 
 // ─── Profit Indicator ─────────────────────────────────────────────────────────
 
@@ -117,12 +118,18 @@ function RecipeDetailModal({ recipe, ingredientsById, onClose }: { recipe: Recip
 
 // ─── Recipe Builder Modal ─────────────────────────────────────────────────────
 
-function RecipeBuilderModal({ ingredients, onClose, onSave }: {
+function RecipeBuilderModal({ ingredients, recipeCategories, onClose, onSave }: {
   ingredients: Ingredient[];
+  recipeCategories: BackendRecipeCategory[];
   onClose: () => void;
-  onSave: (recipe: Partial<Recipe>) => void;
+  onSave: (recipe: Partial<Recipe> & { categoryId?: string }) => void;
 }) {
-  const [form, setForm] = useState({ name: '', category: 'Principales', salePrice: '', description: '' });
+  const [form, setForm] = useState({
+    name: '',
+    category: recipeCategories[0]?.name || '',
+    salePrice: '',
+    description: '',
+  });
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [searchIng, setSearchIng] = useState('');
 
@@ -181,7 +188,7 @@ function RecipeBuilderModal({ ingredients, onClose, onSave }: {
               <div>
                 <label className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5 block">Categoría</label>
                 <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm text-slate-900 dark:text-white outline-none">
-                  {['Principales', 'Pizzas', 'Ensaladas', 'Acompañamientos', 'Bebidas'].map(c => <option key={c}>{c}</option>)}
+                  {recipeCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
                 </select>
               </div>
               <div>
@@ -310,7 +317,15 @@ function RecipeBuilderModal({ ingredients, onClose, onSave }: {
           <button
             onClick={() => {
               if (!form.name || !form.salePrice) { toast.error('Completa los campos requeridos'); return; }
-              onSave({ name: form.name, category: form.category, salePrice: Number(form.salePrice), description: form.description, ingredients: recipeIngredients, active: true });
+              onSave({
+                name: form.name,
+                category: form.category,
+                categoryId: recipeCategories.find(c => c.name === form.category)?.id,
+                salePrice: Number(form.salePrice),
+                description: form.description,
+                ingredients: recipeIngredients,
+                active: true,
+              });
             }}
             className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
           >
@@ -386,16 +401,23 @@ export default function Recipes() {
   const [filterCat, setFilterCat] = useState('Todas');
   const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
+  const [catalogRecipeCategories, setCatalogRecipeCategories] = useState<BackendRecipeCategory[]>([]);
 
   const ingredientsById = useMemo(
     () => new Map(ingredients.map(i => [i.id, i])),
     [ingredients],
   );
 
-  const recipeCategories = useMemo(
+  const filterCategories = useMemo(
     () => [...new Set(recipeList.map(r => r.category).filter(Boolean))],
     [recipeList],
   );
+
+  useEffect(() => {
+    configApi.listRecipeCategories()
+      .then(setCatalogRecipeCategories)
+      .catch(() => setCatalogRecipeCategories([]));
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -480,7 +502,7 @@ export default function Recipes() {
           <input type="text" placeholder="Buscar receta..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 text-sm bg-transparent outline-none text-slate-700 dark:text-slate-300 placeholder:text-slate-400" />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {['Todas', ...recipeCategories].map(cat => (
+          {['Todas', ...filterCategories].map(cat => (
             <button
               key={cat}
               onClick={() => setFilterCat(cat)}
@@ -514,12 +536,14 @@ export default function Recipes() {
       {showBuilder && (
         <RecipeBuilderModal
           ingredients={ingredients}
+          recipeCategories={catalogRecipeCategories}
           onClose={() => setShowBuilder(false)}
           onSave={async data => {
             try {
               const created = await recipesApi.createRecipe({
                 name: data.name!,
                 description: data.description,
+                category_id: data.categoryId,
                 sale_price: data.salePrice!,
                 status: 'ACTIVE',
               });
