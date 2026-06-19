@@ -4,6 +4,7 @@
 -- =====================================================
 -- Requiere el esquema ya creado (`create.sql` o `docker-init/01-schema.sql`). En Docker, el seed duplicado
 -- está en `docker-init/02-seed.sql` para el primer arranque del contenedor.
+-- Datos demo extendidos (pedidos históricos, mermas, gráficos): `populate-demo-data.sql` o `docker-init/03-demo-data.sql`.
 
 INSERT INTO branches (name, address, phone)
 VALUES
