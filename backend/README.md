@@ -31,7 +31,7 @@ pip install -r requirements.txt
 export DATABASE_URL='postgresql+psycopg://kitchenflow:kitchenflow@localhost:5432/kitchenflow'
 ```
 
-Opcional: crea un archivo `.env` en `backend/` con la misma variable (`DATABASE_URL=...`).
+Crea un archivo `.env` en `backend/` (puedes copiar `.env.example`) con al menos `DATABASE_URL` y `JWT_SECRET_KEY`.
 
 4. Arranca Uvicorn desde la carpeta `backend/` para que el paquete `app` se resuelva bien:
 

@@ -6,6 +6,8 @@ export type BackendOrderStatus = 'PENDING' | 'PREPARING' | 'READY' | 'DELIVERED'
 export type BackendRecipeStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface LoginResponse {
+  access_token: string;
+  token_type: string;
   sub: string;
   email: string;
   first_name: string;

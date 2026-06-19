@@ -1,34 +1,63 @@
-"""Autenticación y sesiones (stub).
+"""Autenticación con contraseñas bcrypt y tokens JWT."""
 
-En el modelo `users` la contraseña real irá como `password_hash`; el login del front debe
-mandar texto plano (HTTPS) solo para este endpoint que validará contra el hash.
-"""
-
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import bcrypt
+import jwt
 from fastapi import HTTPException
-
-from app.db.dependency import get_db
-from app.models.user_model import User
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
 
-
-def verify_password(plain_password: str, hashed: str) -> bool:
-    """
-    Esperado: Comparar texto plano con `password_hash` (p. ej. bcrypt/argon2).
-
-    Actualmente seed usa placeholders; al implementar, reemplazar seeds por hashes reales.
-    """
-    return plain_password == hashed
+from app.config import get_settings
+from app.models.user_model import User
+from app.services.serializers import enum_val, uuid_str
 
 
 def hash_password(plain_password: str) -> str:
-    """Hash de contraseña; placeholder compatible con seed hasta usar bcrypt."""
-    return plain_password
+    return bcrypt.hashpw(plain_password.encode(), bcrypt.gensalt()).decode()
 
 
-async def authenticate_user(email: str, password: str, db: Session) -> dict:
+def verify_password(plain_password: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain_password.encode(), hashed.encode())
+    except ValueError:
+        return False
+
+
+def create_access_token(*, user_id: UUID, role: str) -> str:
+    settings = get_settings()
+    expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
+    payload = {
+        "sub": str(user_id),
+        "role": role,
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+
+def decode_access_token(token: str) -> dict:
+    settings = get_settings()
+    try:
+        return jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=401, detail="Token expirado") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Token inválido") from exc
+
+
+def get_user_id_from_token(token: str) -> UUID:
+    claims = decode_access_token(token)
+    try:
+        return UUID(claims["sub"])
+    except (KeyError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=401, detail="Token inválido") from exc
+
+
+async def authenticate_user(email: str, password: str, db: Session) -> User:
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
@@ -40,28 +69,28 @@ async def authenticate_user(email: str, password: str, db: Session) -> dict:
 
 
 def build_login_token_payload(user: User, *, branch_name: str | None = None) -> dict:
-    """
-    Esperado:
-    - Construir payload del JWT (sub=user id UUID, rol, exp, etc.).
-    - No debe incluir el hash de contraseña.
-    """
-    from app.services.serializers import enum_val, uuid_str
+    settings = get_settings()
+    role = enum_val(user.role)
+    expire = datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expire_hours)
 
     return {
+        "access_token": create_access_token(user_id=user.id, role=role),
+        "token_type": "bearer",
         "sub": uuid_str(user.id),
         "email": user.email,
         "first_name": user.first_name,
         "last_name": user.last_name,
-        "role": enum_val(user.role),
+        "role": role,
         "branch_id": uuid_str(user.branch_id),
         "branch_name": branch_name,
-        "exp": (datetime.now() + timedelta(hours=1)).isoformat(),
+        "exp": expire.isoformat(),
     }
+
 
 def get_current_user_from_token_claims(user_id: UUID, db: Session) -> dict:
     """
     Carga usuario desde BD por UUID; rechaza si inactivo o inexistente.
-    Usado por `/auth/me` y futuras dependencias `Depends()` en rutas protegidas.
+    Usado por `/auth/me` y dependencias `Depends()` en rutas protegidas.
     """
     from app.services import config_service
 
