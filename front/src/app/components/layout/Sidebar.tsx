@@ -10,16 +10,16 @@ import { useApp } from '../../context/AppContext';
 import { canAccessPath } from '../../auth/permissions';
 
 const navItems = [
-  { path: '/',         label: 'Dashboard',   icon: LayoutDashboard },
+  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/inventario', label: 'Inventario', icon: Package },
   { path: '/ingreso-inventario', label: 'Ingreso', icon: ClipboardPlus },
-  { path: '/recetas',  label: 'Recetas',     icon: ChefHat },
+  { path: '/recetas', label: 'Recetas', icon: ChefHat },
   { path: '/menu', label: 'Menu / Platos', icon: UtensilsCrossed },
-  { path: '/finanzas', label: 'Finanzas',    icon: TrendingUp },
-  { path: '/ventas',   label: 'Ventas',      icon: ShoppingCart },
+  { path: '/finanzas', label: 'Finanzas', icon: TrendingUp },
+  { path: '/ventas', label: 'Ventas', icon: ShoppingCart },
   { path: '/reportes', label: 'Reportes', icon: FileBarChart2 },
-  { path: '/mermas',   label: 'Mermas',      icon: Trash2 },
-  { path: '/usuarios', label: 'Usuarios',    icon: Users },
+  { path: '/mermas', label: 'Mermas', icon: Trash2 },
+  { path: '/usuarios', label: 'Usuarios', icon: Users },
   { path: '/configuracion', label: 'Configuración', icon: Settings },
 ];
 
@@ -73,13 +73,13 @@ export function Sidebar() {
                 transition-all duration-150 group
                 ${sidebarCollapsed ? 'justify-center' : ''}
                 ${isActive
-                  ? 'bg-blue-500/20 text-blue-400 font-medium'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-blue-500/20 text-white font-medium'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white text-white'
                 }
               `}
               title={sidebarCollapsed ? label : undefined}
             >
-              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-400' : 'text-slate-500 group-hover:text-white'}`} />
+              <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-white group-hover:text-white'}`} />
               {!sidebarCollapsed && <span>{label}</span>}
               {isActive && !sidebarCollapsed && (
                 <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-400" />
