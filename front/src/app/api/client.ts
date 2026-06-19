@@ -1,5 +1,6 @@
 import { translateApiError } from './errors';
 import { getApiV1Url } from './config';
+import { getAccessToken } from './session';
 
 export class ApiError extends Error {
   constructor(
@@ -45,10 +46,12 @@ async function parseErrorResponse(response: Response): Promise<string> {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { body, params, headers, ...rest } = options;
+  const token = getAccessToken();
   const response = await fetch(buildUrl(path, params), {
     ...rest,
     headers: {
       Accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },

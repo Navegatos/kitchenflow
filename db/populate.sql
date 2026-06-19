@@ -19,13 +19,13 @@ INSERT INTO users (
     branch_id
 )
 VALUES
-('Jose', 'Admin', 'admin@kitchenflow.cl', 'hashed_password_1', 'ADMIN',
+('Jose', 'Admin', 'admin@kitchenflow.cl', '$2b$12$TIYpO6rL6/l7qiZuB3dY1OAjVVKuXotcgoLZulVdPdasrYzmZXc/C', 'ADMIN',
  (SELECT id FROM branches WHERE name = 'Santiago Centro')),
-('Camila', 'Manager', 'manager@kitchenflow.cl', 'hashed_password_2', 'MANAGER',
+('Camila', 'Manager', 'manager@kitchenflow.cl', '$2b$12$SujHt475H6PJ4yT4.hyUkOrxCmKVSZh/Fwkc1tVaN913BJjxmGtWK', 'MANAGER',
  (SELECT id FROM branches WHERE name = 'Providencia')),
-('Diego', 'Chef', 'chef@kitchenflow.cl', 'hashed_password_3', 'CHEF',
+('Diego', 'Chef', 'chef@kitchenflow.cl', '$2b$12$gxgwRDF8rVvsyw6pFDQYDORo0YGyEDNDt21zlBsY3VH5Y4BlYs1bi', 'CHEF',
  (SELECT id FROM branches WHERE name = 'Santiago Centro')),
-('Valentina', 'Waiter', 'waiter@kitchenflow.cl', 'hashed_password_4', 'WAITER',
+('Valentina', 'Waiter', 'waiter@kitchenflow.cl', '$2b$12$kjFQy7s6J7DnDFxp0oOHUOT9R7/HHeVm9C6dOAyAXSKH4d7Nt2R/m', 'WAITER',
  (SELECT id FROM branches WHERE name = 'Providencia'));
 
 INSERT INTO categories (name, description)

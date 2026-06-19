@@ -16,6 +16,10 @@ class Settings(BaseSettings):
         "http://localhost:3000"
     )
 
+    jwt_secret_key: str
+    jwt_algorithm: str = "HS256"
+    jwt_expire_hours: int = 8
+
 
 def get_settings() -> Settings:
     return Settings()

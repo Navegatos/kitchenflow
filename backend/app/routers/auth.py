@@ -1,15 +1,15 @@
 """Rutas de autenticación (`/login` del front → `POST /api/v1/auth/login`)."""
 
-from uuid import UUID
-
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr
-
-from app.services import auth_service
-from app.db.dependency import get_db
 from sqlalchemy.orm import Session
 
+from app.db.dependency import get_db
+from app.services import auth_service
+
 router = APIRouter(prefix="/auth", tags=["auth"])
+bearer_scheme = HTTPBearer()
 
 
 class LoginBody(BaseModel):
@@ -19,9 +19,7 @@ class LoginBody(BaseModel):
 
 @router.post("/login")
 async def login(body: LoginBody, db: Session = Depends(get_db)) -> dict:
-    """
-    Valida credenciales y debe devolver token (JWT) y metadatos mínimos del usuario.
-    """
+    """Valida credenciales y devuelve JWT con metadatos mínimos del usuario."""
     from app.services import config_service
 
     user = await auth_service.authenticate_user(body.email, body.password, db)
@@ -30,9 +28,10 @@ async def login(body: LoginBody, db: Session = Depends(get_db)) -> dict:
 
 
 @router.get("/me")
-def me(user_id: UUID = Query(...), db: Session = Depends(get_db)) -> dict:
-    """
-    Valida que la sesión siga vigente: usuario existe y está activo.
-    Hasta tener JWT, el front envía el `sub` guardado en localStorage.
-    """
+def me(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Valida el JWT y devuelve datos del usuario (renueva token si sigue activo)."""
+    user_id = auth_service.get_user_id_from_token(credentials.credentials)
     return auth_service.get_current_user_from_token_claims(user_id, db)

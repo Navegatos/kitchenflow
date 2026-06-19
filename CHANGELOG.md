@@ -1,6 +1,37 @@
 # Changelog
 
-Todos los cambios notables de la rama `dale-tu-front` respecto a `main`.
+Todos los cambios notables por rama respecto a `main`.
+
+## [hashed-passwords] — 2026-06-18
+
+### Autenticación y sesión
+
+- Contraseñas verificadas con **bcrypt** (`verify_password` / `hash_password`); eliminada la comparación en texto plano del stub anterior.
+- Emisión de **JWT** reales en el login (`access_token`, `token_type: bearer`) con PyJWT.
+- Configuración JWT en `Settings`: `JWT_SECRET_KEY` (obligatoria), `JWT_ALGORITHM` (HS256) y `JWT_EXPIRE_HOURS` (8 h por defecto).
+- `GET /auth/me` protegido con cabecera `Authorization: Bearer …` (HTTPBearer); ya no acepta `user_id` por query string.
+- Payload de login ampliado con token firmado y expiración alineada a la configuración JWT.
+- Mensajes de error para token expirado o inválido.
+
+### Frontend
+
+- Nuevo módulo `session.ts` para persistir sesión en `localStorage` y exponer `getAccessToken`.
+- Cliente HTTP (`client.ts`) adjunta automáticamente el Bearer token en cada petición autenticada.
+- `validateSession` revalida contra `/auth/me` usando JWT en lugar del UUID en query.
+- Tipo `LoginResponse` ampliado con `access_token` y `token_type`.
+
+### Base de datos
+
+- Seeds (`db/populate.sql`, `db/docker-init/02-seed.sql`) con hashes bcrypt para usuarios de demo (contraseñas sin cambiar: `hashed_password_1` … `hashed_password_4`).
+- Migración `002-password-hashes.sql` para actualizar bases existentes creadas con el seed anterior.
+
+### Infraestructura
+
+- Dependencias nuevas: `bcrypt`, `PyJWT`.
+- Docker Compose carga `backend/.env` vía `env_file` (requerido para `JWT_SECRET_KEY`).
+- README del backend actualizado: `.env` debe incluir `DATABASE_URL` y `JWT_SECRET_KEY`.
+
+---
 
 ## [dale-tu-front] — 2026-06-11
 
