@@ -1,6 +1,82 @@
 # Changelog
 
-Todos los cambios notables de la rama `dale-tu-front` respecto a `main`.
+Cambios notables del proyecto KitchenFlow.
+
+## [simulated-data] — 2026-06-18
+
+### Scripts SQL — datos demo extendidos
+
+- Nuevo script `db/populate-demo-data.sql` y su equivalente para Docker `db/docker-init/03-demo-data.sql` (mismo contenido; el de `docker-init/` se ejecuta automáticamente en orden `03` tras el esquema y el seed básico).
+- Comentario en `db/populate.sql` que referencia estos scripts como paso opcional posterior al seed.
+- **No modifica el esquema**: solo inserta datos de prueba. Requiere esquema (`create.sql` / `01-schema.sql`) y seed básico (`populate.sql` / `02-seed.sql`) ya aplicados.
+
+Contenido generado por los scripts demo:
+
+| Área | Qué agrega |
+|------|------------|
+| Catálogo | 8 productos nuevos (cebolla, papa, pollo, chorizo, mantequilla, jugo, agua, masa pizza) |
+| Alertas de stock | Ajusta stock bajo en Lechuga, Queso Mozzarella y Carne Vacuno |
+| Recetas | 5 recetas nuevas con ingredientes (Lomo Saltado, Pollo a la Plancha, Papas Fritas, Pizza Pepperoni, Combo Bebida) |
+| Pedidos | ~90 pedidos históricos en los últimos 30 días + 6 pedidos de hoy con distintos estados (PENDING, PREPARING, READY, DELIVERED, CANCELLED) |
+| Mermas | ~35 registros de merma distribuidos en 30 días |
+| Inventario | ~60 movimientos (entradas, salidas, ajustes, mermas) con fechas retroactivas |
+
+> **Importante:** estos scripts **no son idempotentes**. Ejecutarlos más de una vez duplica pedidos, mermas y movimientos. Si necesitas volver a cargarlos, reinicia la BD desde cero o elimina manualmente los datos demo antes de reejecutar.
+
+### Actualizar bases de datos locales
+
+#### Opción A — Docker Compose con volumen nuevo (recomendado para empezar de cero)
+
+Desde la raíz del repositorio:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+PostgreSQL aplicará en orden `01-schema.sql`, `02-seed.sql` y `03-demo-data.sql`. Los datos persisten en el volumen `kitchenflow_pgdata`.
+
+#### Opción B — Docker Compose con volumen existente (solo agregar datos demo)
+
+Si ya tienes el esquema y el seed básico pero **no** los datos demo:
+
+```bash
+docker compose exec -T postgres psql -U kitchenflow -d kitchenflow \
+  -f /docker-entrypoint-initdb.d/03-demo-data.sql
+```
+
+(Si el contenedor no monta ese path, copia el archivo al contenedor o usa la ruta local:)
+
+```bash
+docker compose exec -T postgres psql -U kitchenflow -d kitchenflow \
+  < db/docker-init/03-demo-data.sql
+```
+
+#### Opción C — PostgreSQL local sin Docker
+
+Tras aplicar esquema y seed:
+
+```bash
+psql -h localhost -U kitchenflow -d kitchenflow -f db/create.sql
+psql -h localhost -U kitchenflow -d kitchenflow -f db/populate.sql
+psql -h localhost -U kitchenflow -d kitchenflow -f db/populate-demo-data.sql
+```
+
+#### Opción D — Volumen antiguo sin tablas de configuración
+
+Si la BD se creó **antes** de la migración de sucursales y permisos, al arrancar la API se aplica automáticamente `backend/migrations/001-config-branches.sql` (registrada en `schema_migrations`). Alternativa manual:
+
+```bash
+psql -h localhost -U kitchenflow -d kitchenflow -f backend/migrations/001-config-branches.sql
+```
+
+Después de eso, aplica los datos demo con la opción B o C según tu entorno.
+
+#### Verificación rápida
+
+Con Adminer (http://localhost:8080) o `psql`, comprueba que existan filas recientes en `orders`, `waste_records` e `inventory_movements` (por ejemplo, pedidos con `created_at` en los últimos 30 días).
+
+---
 
 ## [dale-tu-front] — 2026-06-11
 
