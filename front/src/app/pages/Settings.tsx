@@ -9,8 +9,8 @@ import type { AppSettingsResponse } from '../api/services/settings';
 import type { LookupOption } from '../api/services/config';
 import { Switch } from '../components/ui/switch';
 
-function Section({ title, description, icon: Icon, children }: {
-  title: string; description: string; icon: React.ElementType; children: React.ReactNode;
+function Section({ title, description, icon: Icon, badge, children }: {
+  title: string; description: string; icon: React.ElementType; badge?: string; children: React.ReactNode;
 }) {
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700/50 overflow-hidden">
@@ -18,8 +18,15 @@ function Section({ title, description, icon: Icon, children }: {
         <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
           <Icon className="w-4 h-4 text-blue-500" />
         </div>
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
+            {badge && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-300">
+                {badge}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-400">{description}</p>
         </div>
       </div>
@@ -46,20 +53,17 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettingsResponse | null>(null);
   const [businessCategories, setBusinessCategories] = useState<LookupOption[]>([]);
   const [currencies, setCurrencies] = useState<LookupOption[]>([]);
-  const [syncOptions, setSyncOptions] = useState<LookupOption[]>([]);
 
   useEffect(() => {
     Promise.all([
       settingsApi.getSettings(),
       configApi.listLookupOptions('business_category') as Promise<LookupOption[]>,
       configApi.listLookupOptions('currency') as Promise<LookupOption[]>,
-      configApi.listLookupOptions('toteat_sync') as Promise<LookupOption[]>,
     ])
-      .then(([s, cats, currs, sync]) => {
+      .then(([s, cats, currs]) => {
         setSettings(s);
         setBusinessCategories(cats);
         setCurrencies(currs);
-        setSyncOptions(sync);
       })
       .catch(error => {
         toast.error(error instanceof ApiError ? error.message : 'No se pudo cargar la configuración');
@@ -97,7 +101,7 @@ export default function SettingsPage() {
     return <p className="p-6 text-sm text-slate-500">No hay configuración disponible.</p>;
   }
 
-  const { business, financial, integrations, notifications } = settings;
+  const { business, financial, notifications } = settings;
 
   return (
     <div className="p-6 space-y-5 max-w-3xl">
@@ -164,32 +168,42 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section title="Integración Toteat" description="Configuración de sincronización de ventas" icon={Zap}>
-        <FormField label="Estado de integración">
-          <div className="flex items-center gap-3">
-            <Switch checked={integrations.toteat_enabled} onCheckedChange={checked => setSettings(p => p && ({ ...p, integrations: { ...p.integrations, toteat_enabled: checked } }))} />
-            <span className={`text-xs font-medium ${integrations.toteat_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-              {integrations.toteat_enabled ? 'Conectado' : 'Desconectado'}
-            </span>
+      <Section
+        title="Integración Toteat"
+        description="Configuración de sincronización de ventas"
+        icon={Zap}
+        badge="No implementado aún"
+      >
+        <div className="rounded-lg bg-slate-100 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600/50 px-4 py-1 pointer-events-none select-none opacity-70">
+          <FormField label="Estado de integración">
+            <div className="flex items-center gap-3">
+              <Switch checked={false} disabled />
+              <span className="text-xs font-medium text-slate-400">
+                Desconectado
+              </span>
+            </div>
+          </FormField>
+          <FormField label="API Key de Toteat" sub="Tu clave de acceso a la API">
+            <input type="password" value="" readOnly placeholder="••••••••••••" className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm outline-none font-mono text-slate-400" />
+          </FormField>
+          <FormField label="Sincronización" sub="Frecuencia de actualización de datos">
+            <select value="manual" disabled className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-sm outline-none text-slate-400">
+              <option value="manual">Manual</option>
+            </select>
+          </FormField>
+          <FormField label="Webhook URL" sub="Para recibir eventos en tiempo real">
+            <input type="url" value="" readOnly placeholder="https://..." className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-xs font-mono text-slate-400 outline-none" />
+          </FormField>
+          <div className="mt-4 pb-4">
+            <button disabled className="flex items-center gap-2 px-4 py-2 bg-blue-600/50 text-white rounded-lg text-sm font-medium cursor-not-allowed">
+              <Save className="w-3.5 h-3.5" />
+              Guardar
+            </button>
           </div>
-        </FormField>
-        <FormField label="API Key de Toteat" sub="Tu clave de acceso a la API">
-          <input type="password" value={integrations.toteat_api_key || ''} onChange={e => setSettings(p => p && ({ ...p, integrations: { ...p.integrations, toteat_api_key: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none font-mono" />
-        </FormField>
-        <FormField label="Sincronización" sub="Frecuencia de actualización de datos">
-          <select value={integrations.toteat_sync} onChange={e => setSettings(p => p && ({ ...p, integrations: { ...p.integrations, toteat_sync: e.target.value } }))} className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-sm outline-none">
-            {syncOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </FormField>
-        <FormField label="Webhook URL" sub="Para recibir eventos en tiempo real">
-          <input type="url" value={integrations.webhook_url || ''} readOnly className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700/50 text-xs font-mono text-slate-500 outline-none" />
-        </FormField>
-        <div className="mt-4">
-          <button onClick={() => saveSection('integrations', 'Integración Toteat')} disabled={saving === 'integrations'} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors">
-            {saving === 'integrations' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-            Guardar
-          </button>
         </div>
+        <p className="mt-3 text-xs text-slate-400">
+          La conexión con Toteat estará disponible en una próxima versión.
+        </p>
       </Section>
 
       <Section title="Notificaciones" description="Configura cuándo y cómo recibir alertas" icon={Bell}>
