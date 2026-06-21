@@ -44,7 +44,6 @@ export function Sidebar() {
         {!sidebarCollapsed && (
           <div>
             <span className="text-sm font-semibold text-white tracking-tight">KitchenFlow</span>
-            <span className="block text-xs text-slate-400">by Toteat</span>
           </div>
         )}
       </div>
