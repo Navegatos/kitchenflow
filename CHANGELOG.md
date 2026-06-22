@@ -2,6 +2,32 @@
 
 Todos los cambios notables por rama respecto a `main`.
 
+## [prepare-for-release] — 2026-06-21
+
+### Despliegue Docker (producción y QA)
+
+- Nuevo `docker-compose.prod.yml`: PostgreSQL, backend y gateway nginx; solo el gateway expone puerto HTTP al host.
+- Nuevo `docker-compose.qa.yml`: mismo stack con Adminer, PostgreSQL publicado al host y proxy a Swagger (`/docs`, `/redoc`, `/openapi.json`).
+- `backend/Dockerfile.prod`: imagen de producción con Uvicorn y 2 workers.
+- `deploy/Dockerfile.gateway`: build multi-stage del frontend (Node) + nginx con SPA y reverse proxy a `/api/`.
+- Configuraciones nginx en `deploy/nginx/prod.conf` y `deploy/nginx/qa.conf`.
+- Plantillas de variables de entorno: `deploy/env/prod.env.example` y `deploy/env/qa.env.example`.
+- Guía de despliegue para el cliente: `deploy/GUIA-DESPLIEGUE-CLIENTE.md`.
+- README ampliado con instrucciones para levantar entornos prod y QA.
+
+### Frontend
+
+- `api/config.ts`: soporte de `VITE_API_URL=""` para peticiones same-origin detrás del gateway nginx (prod/QA).
+- Página de Ajustes: badge opcional en secciones; integración Toteat marcada como «No implementado aún» y limpieza de estado/API de sync no usados.
+- Sidebar: eliminada la línea «by Toteat».
+
+### Infraestructura
+
+- `backend/.dockerignore` para excluir `.venv`, `.env`, `__pycache__` y archivos innecesarios del contexto Docker.
+- `.gitignore` ampliado para ignorar archivos de entorno locales (`deploy/env/*.env`, `backend/.env`).
+
+---
+
 ## [hashed-passwords] — 2026-06-18
 
 ### Autenticación y sesión
@@ -30,7 +56,8 @@ Todos los cambios notables por rama respecto a `main`.
 - Dependencias nuevas: `bcrypt`, `PyJWT`.
 - Docker Compose carga `backend/.env` vía `env_file` (requerido para `JWT_SECRET_KEY`).
 - README del backend actualizado: `.env` debe incluir `DATABASE_URL` y `JWT_SECRET_KEY`.
-Cambios notables del proyecto KitchenFlow.
+
+---
 
 ## [simulated-data] — 2026-06-18
 
