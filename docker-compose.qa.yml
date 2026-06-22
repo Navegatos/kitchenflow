@@ -1,0 +1,101 @@
+# KitchenFlow — QA (pre-producción / staging)
+#
+# Uso:
+#   cp deploy/env/qa.env.example deploy/env/qa.env
+#   docker compose --env-file deploy/env/qa.env -f docker-compose.qa.yml up -d --build
+#
+# | Servicio  | URL / puerto |
+# |-----------|----------------|
+# | App       | http://localhost:${HTTP_PORT:-8090} |
+# | Swagger   | http://localhost:${HTTP_PORT:-8090}/docs |
+# | Adminer   | http://localhost:${ADMINER_PORT:-8081} |
+# | PostgreSQL| localhost:${POSTGRES_PORT:-5433} |
+
+name: kitchenflow-qa
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./db/docker-init:/docker-entrypoint-initdb.d:ro
+      - kitchenflow_pgdata_qa:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    networks: [kitchenflow-qa]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kitchenflow-qa]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.gateway
+      args:
+        VITE_API_URL: ""
+        NGINX_CONF: qa
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-8090}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [kitchenflow-qa]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8081}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kitchenflow-qa]
+
+networks:
+  kitchenflow-qa:
+    driver: bridge
+
+volumes:
+  kitchenflow_pgdata_qa:

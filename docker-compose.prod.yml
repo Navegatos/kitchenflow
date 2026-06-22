@@ -1,0 +1,84 @@
+# KitchenFlow — producción
+#
+# Uso:
+#   cp deploy/env/prod.env.example deploy/env/prod.env
+#   # Editar deploy/env/prod.env con contraseñas y secretos reales
+#   docker compose --env-file deploy/env/prod.env -f docker-compose.prod.yml up -d --build
+#
+# La aplicación queda en http://localhost:${HTTP_PORT:-80} (nginx gateway).
+# PostgreSQL y la API no se exponen al host; solo el gateway.
+
+name: kitchenflow-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./db/docker-init:/docker-entrypoint-initdb.d:ro
+      - kitchenflow_pgdata_prod:/var/lib/postgresql/data
+    networks: [kitchenflow-prod]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    restart: always
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [kitchenflow-prod]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.gateway
+      args:
+        VITE_API_URL: ""
+        NGINX_CONF: prod
+    restart: always
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [kitchenflow-prod]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  kitchenflow-prod:
+    driver: bridge
+
+volumes:
+  kitchenflow_pgdata_prod:
